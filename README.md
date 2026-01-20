@@ -240,8 +240,3 @@ ShaggyBot uses SQLite for data persistence. The database is automatically create
 - Attach Files
 - Add Reactions
 - Moderate Members (for timeouts)
-
-## 📝 License
-
-ISC
-
