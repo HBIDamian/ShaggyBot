@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title: title }) %>
+</head>
+<body class="bg-zinc-950 text-white min-h-screen guild-page">
+  <%- include('partials/background') %>
+  <%- include('partials/navbar', { requiresAuth: true, activePage: 'dashboard' }) %>
+
+  <div class="flex min-h-[calc(100vh-65px)] relative z-10">
+    <%- include('partials/sidebar', { activeSection: 'logs' }) %>
+
+    <!-- Main Content -->
+    <main class="flex-1 p-4 md:p-8 overflow-y-auto lg:ml-72">
+      <div class="max-w-4xl mx-auto">
+        <div class="mb-6 md:mb-8">
+          <h1 class="text-xl md:text-2xl font-bold mb-2">Logs</h1>
+          <p class="text-zinc-400 text-sm md:text-base">View all moderation and admin activities in your server.</p>
+        </div>
+
+        <!-- Log Retention Settings -->
+        <div class="bg-zinc-900 p-4 rounded-xl border border-zinc-800 mb-4 md:mb-6">
+          <h3 class="font-semibold text-white mb-4">Retention Settings</h3>
+          
+          <!-- Mod Actions Retention -->
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4 pb-4 border-b border-zinc-800">
+            <div>
+              <h4 class="font-medium text-white mb-1">Mod Action Logs</h4>
+              <p class="text-sm text-zinc-400">Auto-delete mod action logs older than specified days.</p>
+            </div>
+            <div class="flex items-center gap-3">
+              <input type="range" id="retentionSlider" min="1" max="31" value="7" 
+                     class="w-32 h-2 bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                     oninput="updateRetentionLabel()">
+              <div class="flex items-center gap-2">
+                <input type="number" id="retentionDays" min="1" max="31" value="7" 
+                       class="w-16 bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1 text-center text-sm focus:outline-none focus:border-indigo-500"
+                       oninput="syncRetentionSlider()">
+                <span class="text-sm text-zinc-400">days</span>
+              </div>
+              <button onclick="saveRetention()" id="saveRetentionBtn" class="bg-indigo-600 hover:bg-indigo-700 px-4 py-1.5 rounded-lg text-sm font-medium transition disabled:opacity-50 disabled:cursor-not-allowed">
+                Save
+              </button>
+            </div>
+          </div>
+          
+          <!-- Warning Retention -->
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h4 class="font-medium text-white mb-1">Warnings</h4>
+              <p class="text-sm text-zinc-400">Auto-delete warnings older than specified days. <span class="text-indigo-400">0 = keep forever</span></p>
+            </div>
+            <div class="flex items-center gap-3">
+              <input type="range" id="warningRetentionSlider" min="0" max="365" value="365" 
+                     class="w-32 h-2 bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-yellow-500"
+                     oninput="updateWarningRetentionLabel()">
+              <div class="flex items-center gap-2">
+                <input type="number" id="warningRetentionDays" min="0" max="365" value="365" 
+                       class="w-16 bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1 text-center text-sm focus:outline-none focus:border-indigo-500"
+                       oninput="syncWarningRetentionSlider()">
+                <span class="text-sm text-zinc-400">days</span>
+              </div>
+              <button onclick="saveWarningRetention()" id="saveWarningRetentionBtn" class="bg-indigo-600 hover:bg-indigo-700 px-4 py-1.5 rounded-lg text-sm font-medium transition disabled:opacity-50 disabled:cursor-not-allowed">
+                Save
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Tabs -->
+        <div class="flex gap-2 mb-4 md:mb-6 border-b border-zinc-800 pb-2 overflow-x-auto">
+          <button class="tab-btn px-3 md:px-4 py-2 rounded-lg bg-indigo-600 font-medium text-sm md:text-base whitespace-nowrap" data-tab="actions">Mod Actions</button>
+          <button class="tab-btn px-3 md:px-4 py-2 rounded-lg text-zinc-400 hover:bg-zinc-800 transition text-sm md:text-base whitespace-nowrap" data-tab="warnings">Warnings</button>
+        </div>
+
+        <!-- Actions Tab -->
+        <div id="actionsTab" class="tab-content">
+          <div class="flex flex-col sm:flex-row gap-3 md:gap-4 mb-4">
+            <input type="text" id="actionSearch" placeholder="Search by user ID..." 
+                   class="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 text-sm md:text-base focus:outline-none focus:border-indigo-500">
+            <select id="actionFilter" class="bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 text-sm md:text-base focus:outline-none focus:border-indigo-500">
+              <option value="">All Actions</option>
+              <option value="kick">Kicks</option>
+              <option value="ban">Bans</option>
+              <option value="mute">Mutes</option>
+              <option value="warn">Warnings</option>
+              <option value="automod">Auto-mod</option>
+            </select>
+          </div>
+          <div id="actionsContainer" class="bg-zinc-900 rounded-xl border border-zinc-800 overflow-x-auto">
+            <div class="text-center py-12 text-zinc-400">Loading mod actions...</div>
+          </div>
+        </div>
+
+        <!-- Warnings Tab -->
+        <div id="warningsTab" class="tab-content hidden">
+          <!-- Search/Filter Bar -->
+          <div class="bg-zinc-900 p-3 md:p-4 rounded-xl border border-zinc-800 mb-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+              <div>
+                <label class="block text-xs font-medium text-zinc-400 mb-1.5">Search User ID</label>
+                <input type="text" id="searchUser" placeholder="User ID..."
+                       class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-zinc-400 mb-1.5">Search Moderator ID</label>
+                <input type="text" id="searchModerator" placeholder="Moderator ID..."
+                       class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-zinc-400 mb-1.5">Warning ID</label>
+                <input type="text" id="searchId" placeholder="Warning ID..."
+                       class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+              </div>
+              <div class="flex items-end">
+                <button onclick="searchWarnings()" class="w-full bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg font-medium text-sm transition">
+                  Search
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Stats Cards -->
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-4">
+            <div class="bg-zinc-900 p-3 md:p-4 rounded-xl border border-zinc-800 text-center">
+              <span id="totalWarnings" class="block text-xl md:text-2xl font-bold text-yellow-400">-</span>
+              <span class="text-xs text-zinc-400">Total Warnings</span>
+            </div>
+            <div class="bg-zinc-900 p-3 md:p-4 rounded-xl border border-zinc-800 text-center">
+              <span id="activeWarnings" class="block text-xl md:text-2xl font-bold text-red-400">-</span>
+              <span class="text-xs text-zinc-400">Active Warnings</span>
+            </div>
+            <div class="bg-zinc-900 p-4 rounded-xl border border-zinc-800 text-center">
+              <span id="warnedUsers" class="block text-2xl font-bold text-indigo-400">-</span>
+              <span class="text-xs text-zinc-400">Warned Users</span>
+            </div>
+            <div class="bg-zinc-900 p-4 rounded-xl border border-zinc-800 text-center">
+              <span id="thisMonth" class="block text-2xl font-bold text-green-400">-</span>
+              <span class="text-xs text-zinc-400">This Month</span>
+            </div>
+          </div>
+
+          <div id="warningsContainer" class="bg-zinc-900 rounded-xl border border-zinc-800 overflow-x-auto">
+            <div class="text-center py-12 text-zinc-400">Loading warnings...</div>
+          </div>
+
+          <!-- Pagination -->
+          <div id="pagination" class="flex justify-center gap-2 mt-4 hidden">
+            <button onclick="changePage(-1)" id="prevBtn" class="bg-zinc-800 hover:bg-zinc-700 px-4 py-2 rounded-lg text-sm transition disabled:opacity-50 disabled:cursor-not-allowed">
+              ← Previous
+            </button>
+            <span id="pageInfo" class="px-4 py-2 text-sm text-zinc-400"></span>
+            <button onclick="changePage(1)" id="nextBtn" class="bg-zinc-800 hover:bg-zinc-700 px-4 py-2 rounded-lg text-sm transition disabled:opacity-50 disabled:cursor-not-allowed">
+              Next →
+            </button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    let allWarnings = [];
+    let currentPage = 1;
+    let totalPages = 1;
+    let originalRetentionDays = 7;
+    let originalWarningRetentionDays = 365;
+
+    function onGuildReady(data) {
+      document.title = `Audit Log - ${data.name} - ShaggyBot`;
+      loadRetentionSettings();
+      loadWarningRetentionSettings();
+      loadModActions();
+      loadWarnings();
+    }
+
+    // Retention settings functions
+    function loadRetentionSettings() {
+      fetch(`/api/guilds/${guildId}/modactions/retention`).then(res => res.json()).then(data => {
+        const days = data.retention_days || 7;
+        originalRetentionDays = days;
+        document.getElementById('retentionSlider').value = days;
+        document.getElementById('retentionDays').value = days;
+        updateSaveButtonState();
+      }).catch(() => {
+        console.error('Failed to load retention settings');
+      });
+    }
+
+    function updateRetentionLabel() {
+      const slider = document.getElementById('retentionSlider');
+      document.getElementById('retentionDays').value = slider.value;
+      updateSaveButtonState();
+    }
+
+    function syncRetentionSlider() {
+      const input = document.getElementById('retentionDays');
+      let value = parseInt(input.value) || 7;
+      value = Math.min(31, Math.max(1, value));
+      input.value = value;
+      document.getElementById('retentionSlider').value = value;
+      updateSaveButtonState();
+    }
+
+    function updateSaveButtonState() {
+      const currentValue = parseInt(document.getElementById('retentionDays').value) || 7;
+      const btn = document.getElementById('saveRetentionBtn');
+      btn.disabled = currentValue === originalRetentionDays;
+    }
+
+    // Warning Retention functions
+    function loadWarningRetentionSettings() {
+      fetch(`/api/guilds/${guildId}/warnings/retention`).then(res => res.json()).then(data => {
+        const days = data.retention_days ?? 365;
+        originalWarningRetentionDays = days;
+        document.getElementById('warningRetentionSlider').value = days;
+        document.getElementById('warningRetentionDays').value = days;
+        updateWarningRetentionLabel();
+        updateWarningSaveButtonState();
+      }).catch(() => {
+        console.error('Failed to load warning retention settings');
+      });
+    }
+
+    function updateWarningRetentionLabel() {
+      const slider = document.getElementById('warningRetentionSlider');
+      const input = document.getElementById('warningRetentionDays');
+      input.value = slider.value;
+      updateWarningSaveButtonState();
+    }
+
+    function syncWarningRetentionSlider() {
+      const input = document.getElementById('warningRetentionDays');
+      let value = parseInt(input.value);
+      if (isNaN(value)) value = 365;
+      value = Math.min(365, Math.max(0, value));
+      input.value = value;
+      document.getElementById('warningRetentionSlider').value = value;
+      updateWarningSaveButtonState();
+    }
+
+    function updateWarningSaveButtonState() {
+      const currentValue = parseInt(document.getElementById('warningRetentionDays').value);
+      const btn = document.getElementById('saveWarningRetentionBtn');
+      btn.disabled = currentValue === originalWarningRetentionDays;
+    }
+
+    async function saveWarningRetention() {
+      const days = parseInt(document.getElementById('warningRetentionDays').value);
+      const btn = document.getElementById('saveWarningRetentionBtn');
+      btn.disabled = true;
+      btn.textContent = 'Saving...';
+
+      try {
+        const res = await fetch(`/api/guilds/${guildId}/warnings/retention`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ retention_days: days })
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          originalWarningRetentionDays = days;
+          btn.textContent = 'Saved!';
+          if (data.deleted_count > 0) {
+            showNotification(`Warning retention updated. ${data.deleted_count} old warning(s) cleaned up.`, 'success');
+            // Reload warnings to reflect any deleted
+            loadWarnings();
+          } else {
+            const msg = days === 0 ? 'Warnings will be kept forever.' : 'Warning retention settings saved.';
+            showNotification(msg, 'success');
+          }
+          setTimeout(() => {
+            btn.textContent = 'Save';
+            updateWarningSaveButtonState();
+          }, 2000);
+        } else {
+          throw new Error('Failed to save');
+        }
+      } catch (error) {
+        btn.textContent = 'Save';
+        btn.disabled = false;
+        showNotification('Failed to save warning retention settings.', 'error');
+      }
+    }
+
+    async function saveRetention() {
+      const days = parseInt(document.getElementById('retentionDays').value) || 7;
+      const btn = document.getElementById('saveRetentionBtn');
+      btn.disabled = true;
+      btn.textContent = 'Saving...';
+
+      try {
+        const res = await fetch(`/api/guilds/${guildId}/modactions/retention`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ retention_days: days })
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          originalRetentionDays = days;
+          btn.textContent = 'Saved!';
+          if (data.deleted_count > 0) {
+            showNotification(`Retention updated. ${data.deleted_count} old log(s) cleaned up.`, 'success');
+          } else {
+            showNotification('Retention settings saved.', 'success');
+          }
+          // Reload mod actions to reflect any deleted logs
+          loadModActions();
+          setTimeout(() => {
+            btn.textContent = 'Save';
+            updateSaveButtonState();
+          }, 2000);
+        } else {
+          throw new Error('Failed to save');
+        }
+      } catch (error) {
+        btn.textContent = 'Save';
+        btn.disabled = false;
+        showNotification('Failed to save retention settings.', 'error');
+      }
+    }
+
+    function showNotification(message, type = 'info') {
+      const colors = {
+        success: 'bg-green-600',
+        error: 'bg-red-600',
+        info: 'bg-indigo-600'
+      };
+      const notification = document.createElement('div');
+      notification.className = `fixed bottom-4 right-4 ${colors[type]} text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-fade-in`;
+      notification.textContent = message;
+      document.body.appendChild(notification);
+      setTimeout(() => {
+        notification.remove();
+      }, 4000);
+    }
+
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => {
+          b.classList.remove('bg-indigo-600', 'font-medium');
+          b.classList.add('text-zinc-400', 'hover:bg-zinc-800');
+        });
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+        btn.classList.add('bg-indigo-600', 'font-medium');
+        btn.classList.remove('text-zinc-400', 'hover:bg-zinc-800');
+        document.getElementById(`${btn.dataset.tab}Tab`).classList.remove('hidden');
+      });
+    });
+
+    function formatDate(dateString) { return formatDateWithTimezone(dateString); }
+
+    function getActionBadge(action) {
+      const badges = {
+        kick: 'bg-yellow-500/20 text-yellow-400',
+        ban: 'bg-red-500/20 text-red-400',
+        mute: 'bg-blue-500/20 text-blue-400',
+        warn: 'bg-yellow-500/20 text-yellow-400',
+        automod: 'bg-blue-500/20 text-blue-400',
+        delete: 'bg-zinc-500/20 text-zinc-400'
+      };
+      return badges[action] || badges.delete;
+    }
+
+    function loadModActions() {
+      fetch(`/api/guilds/${guildId}/modactions`).then(res => res.json()).then(actions => {
+        const container = document.getElementById('actionsContainer');
+        if (actions.length === 0) {
+          container.innerHTML = '<div class="text-center py-12 text-zinc-400">No moderation actions recorded yet.</div>';
+          return;
+        }
+        container.innerHTML = `
+          <table class="w-full min-w-[700px]">
+            <thead class="bg-zinc-800 text-left text-xs text-zinc-400 uppercase">
+              <tr>
+                <th class="px-4 py-3 whitespace-nowrap">Action</th>
+                <th class="px-4 py-3 whitespace-nowrap">User</th>
+                <th class="px-4 py-3 whitespace-nowrap">Moderator</th>
+                <th class="px-4 py-3 whitespace-nowrap">Reason</th>
+                <th class="px-4 py-3 whitespace-nowrap">Date</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-zinc-800">
+              ${actions.map(action => `
+                <tr class="hover:bg-zinc-800/50" data-user="${action.user_id}" data-action="${action.action}">
+                  <td class="px-4 py-3 whitespace-nowrap"><span class="px-2 py-1 rounded text-xs font-semibold uppercase ${getActionBadge(action.action)}">${action.action}</span></td>
+                  <td class="px-4 py-3 whitespace-nowrap">
+                    ${action.user_name ? `<div class="text-sm font-medium">${action.user_name}</div>` : ''}
+                    <code class="bg-zinc-800 px-2 py-0.5 rounded text-xs">${action.user_id}</code>
+                  </td>
+                  <td class="px-4 py-3 whitespace-nowrap">
+                    ${action.moderator_name ? `<div class="text-sm font-medium">${action.moderator_name}</div>` : ''}
+                    <code class="bg-zinc-800 px-2 py-0.5 rounded text-xs">${action.moderator_id || 'Auto-mod'}</code>
+                  </td>
+                  <td class="px-4 py-3 text-sm text-zinc-400 max-w-xs truncate">${action.reason || 'No reason'}</td>
+                  <td class="px-4 py-3 text-sm text-zinc-400 whitespace-nowrap">${formatDate(action.created_at)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `;
+        filterActions();
+      }).catch(() => {
+        document.getElementById('actionsContainer').innerHTML = '<div class="text-center py-12 text-red-400">Failed to load mod actions.</div>';
+      });
+    }
+
+    function loadWarnings() {
+      fetch(`/api/guilds/${guildId}/warnings/all`).then(res => res.json()).then(data => {
+        allWarnings = data.warnings || [];
+        
+        // Update stats
+        document.getElementById('totalWarnings').textContent = data.stats?.total || allWarnings.length;
+        document.getElementById('activeWarnings').textContent = data.stats?.active || allWarnings.length;
+        document.getElementById('warnedUsers').textContent = data.stats?.users || new Set(allWarnings.map(w => w.user_id)).size;
+        document.getElementById('thisMonth').textContent = data.stats?.thisMonth || 0;
+
+        renderWarnings(allWarnings);
+      }).catch(() => {
+        document.getElementById('warningsContainer').innerHTML = '<div class="text-center py-12 text-red-400">Failed to load warnings.</div>';
+      });
+    }
+
+    function searchWarnings() {
+      const userId = document.getElementById('searchUser').value.trim();
+      const moderatorId = document.getElementById('searchModerator').value.trim();
+      const warningId = document.getElementById('searchId').value.trim();
+
+      let filtered = allWarnings;
+
+      if (userId) {
+        filtered = filtered.filter(w => w.user_id.includes(userId));
+      }
+      if (moderatorId) {
+        filtered = filtered.filter(w => w.moderator_id && w.moderator_id.includes(moderatorId));
+      }
+      if (warningId) {
+        filtered = filtered.filter(w => w.id.toString() === warningId);
+      }
+
+      currentPage = 1;
+      renderWarnings(filtered);
+    }
+
+    function renderWarnings(warnings) {
+      const container = document.getElementById('warningsContainer');
+      const perPage = 10;
+      totalPages = Math.ceil(warnings.length / perPage) || 1;
+      
+      if (warnings.length === 0) {
+        container.innerHTML = '<div class="text-center py-12 text-zinc-400">No warnings found.</div>';
+        document.getElementById('pagination').classList.add('hidden');
+        return;
+      }
+
+      const start = (currentPage - 1) * perPage;
+      const pageWarnings = warnings.slice(start, start + perPage);
+
+      container.innerHTML = `
+        <table class="w-full min-w-[800px]">
+          <thead class="bg-zinc-800 text-left text-xs text-zinc-400 uppercase">
+            <tr>
+              <th class="px-4 py-3 whitespace-nowrap">ID</th>
+              <th class="px-4 py-3 whitespace-nowrap">User</th>
+              <th class="px-4 py-3 whitespace-nowrap">Moderator</th>
+              <th class="px-4 py-3 whitespace-nowrap">Reason</th>
+              <th class="px-4 py-3 whitespace-nowrap">Date</th>
+              <th class="px-4 py-3 whitespace-nowrap">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-zinc-800">
+            ${pageWarnings.map(w => `
+              <tr class="hover:bg-zinc-800/50" id="warning-row-${w.id}">
+                <td class="px-4 py-3 text-sm font-mono text-zinc-400 whitespace-nowrap">#${w.id}</td>
+                <td class="px-4 py-3 whitespace-nowrap">
+                  ${w.user_name ? `<div class="text-sm font-medium">${w.user_name}</div>` : ''}
+                  <code class="bg-zinc-800 px-2 py-0.5 rounded text-xs">${w.user_id}</code>
+                </td>
+                <td class="px-4 py-3 whitespace-nowrap">
+                  ${w.moderator_name ? `<div class="text-sm font-medium">${w.moderator_name}</div>` : ''}
+                  <code class="bg-zinc-800 px-2 py-0.5 rounded text-xs">${w.moderator_id || 'System'}</code>
+                </td>
+                <td class="px-4 py-3 text-sm text-zinc-400 max-w-xs truncate" title="${(w.reason || 'No reason').replace(/"/g, '&quot;')}">${w.reason || 'No reason'}</td>
+                <td class="px-4 py-3 text-sm text-zinc-400 whitespace-nowrap">${formatDate(w.created_at)}</td>
+                <td class="px-4 py-3 whitespace-nowrap">
+                  <button onclick="deleteWarning(${w.id})" class="bg-red-500/20 hover:bg-red-500/30 text-red-400 px-3 py-1 rounded text-xs font-medium transition">
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+
+      // Update pagination
+      if (totalPages > 1) {
+        document.getElementById('pagination').classList.remove('hidden');
+        document.getElementById('pageInfo').textContent = `Page ${currentPage} of ${totalPages}`;
+        document.getElementById('prevBtn').disabled = currentPage === 1;
+        document.getElementById('nextBtn').disabled = currentPage === totalPages;
+      } else {
+        document.getElementById('pagination').classList.add('hidden');
+      }
+    }
+
+    function changePage(delta) {
+      currentPage = Math.max(1, Math.min(totalPages, currentPage + delta));
+      searchWarnings();
+    }
+
+    async function deleteWarning(warningId) {
+      if (!confirm('Delete this warning?')) return;
+      try {
+        const res = await fetch(`/api/guilds/${guildId}/warnings/${warningId}`, { method: 'DELETE' });
+        if (res.ok) {
+          allWarnings = allWarnings.filter(w => w.id !== warningId);
+          // Update stats
+          document.getElementById('totalWarnings').textContent = allWarnings.length;
+          document.getElementById('warnedUsers').textContent = new Set(allWarnings.map(w => w.user_id)).size;
+          searchWarnings();
+        } else {
+          alert('Failed to delete warning.');
+        }
+      } catch { alert('Failed to delete warning.'); }
+    }
+
+    function filterActions() {
+      const search = document.getElementById('actionSearch').value.toLowerCase();
+      const filter = document.getElementById('actionFilter').value;
+      document.querySelectorAll('#actionsContainer tbody tr').forEach(row => {
+        const userId = row.dataset.user?.toLowerCase() || '';
+        const action = row.dataset.action?.toLowerCase() || '';
+        row.style.display = (!search || userId.includes(search)) && (!filter || action.includes(filter)) ? '' : 'none';
+      });
+    }
+
+    document.getElementById('actionSearch').addEventListener('input', filterActions);
+    document.getElementById('actionFilter').addEventListener('change', filterActions);
+
+    // Search on Enter key for warnings
+    ['searchUser', 'searchModerator', 'searchId'].forEach(id => {
+      document.getElementById(id).addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') searchWarnings();
+      });
+    });
+  </script>
+  <%- include('partials/scripts/guild-loader') %>
+</body>
+</html>

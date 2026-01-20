@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title: title }) %>
+  <style>
+    .tag-row {
+      transition: background-color 0.15s ease;
+    }
+    .tag-row:hover {
+      background-color: rgba(255, 255, 255, 0.03);
+    }
+    .modal-backdrop {
+      animation: fadeIn 0.15s ease;
+    }
+    .modal-content {
+      animation: slideIn 0.2s ease;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes slideIn {
+      from { opacity: 0; transform: scale(0.95); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    .response-preview {
+      max-height: 80px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+    }
+  </style>
+</head>
+<body class="bg-zinc-950 text-white min-h-screen guild-page">
+  <%- include('partials/background') %>
+  <%- include('partials/navbar', { requiresAuth: true, activePage: 'dashboard' }) %>
+
+  <div class="flex min-h-[calc(100vh-65px)] relative z-10">
+    <%- include('partials/sidebar', { activeSection: 'tags' }) %>
+
+    <!-- Main Content -->
+    <main class="flex-1 p-4 md:p-8 overflow-y-auto lg:ml-72">
+      <div class="max-w-5xl mx-auto">
+        <div class="mb-6 md:mb-8">
+          <h1 class="text-xl md:text-2xl font-bold mb-2">Tags</h1>
+          <p class="text-zinc-400 text-sm md:text-base">Create and manage custom tags that users can invoke with <code class="bg-zinc-800 px-1.5 py-0.5 rounded text-indigo-400">/tag &lt;name&gt;</code></p>
+        </div>
+
+        <!-- Info Banner -->
+        <div class="bg-indigo-500/10 border border-indigo-500/30 rounded-xl p-4 mb-6 flex items-start gap-3">
+          <svg class="w-5 h-5 text-indigo-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+          </svg>
+          <div class="text-sm text-indigo-200">
+            <p class="mb-1"><strong>Tags</strong> are reusable text responses that any user can invoke.</p>
+            <p class="text-indigo-300/70">Users can use <code class="bg-indigo-900/50 px-1 py-0.5 rounded">/tag &lt;name&gt;</code> to display a tag, or <code class="bg-indigo-900/50 px-1 py-0.5 rounded">/tags list</code> to see all available tags.</p>
+          </div>
+        </div>
+
+        <!-- Permission Tier Setting -->
+        <div class="bg-zinc-900 rounded-xl border border-zinc-800 p-4 mb-6">
+          <div class="flex flex-col sm:flex-row sm:items-center gap-3">
+            <div class="flex-1">
+              <label class="block text-sm font-medium text-zinc-300 mb-1">Permission Tier</label>
+              <p class="text-xs text-zinc-500">Control who can create/manage tags and who can manage all tags</p>
+            </div>
+            <select id="permissionTier" onchange="savePermissionTier()"
+                    class="bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-indigo-500 transition min-w-[280px]">
+              <option value="admins-admins">Manage Own: Admins - Manage All: Admins</option>
+              <option value="mods-admins">Manage Own: Mods - Manage All: Admins</option>
+              <option value="mods-mods">Manage Own: Mods - Manage All: Mods</option>
+              <option value="users-admins">Manage Own: Users - Manage All: Admins</option>
+              <option value="users-mods">Manage Own: Users - Manage All: Mods</option>
+              <option value="users-users">Manage Own: Users - Manage All: Users</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Search & Add Bar -->
+        <div class="flex flex-col sm:flex-row gap-3 mb-4">
+          <div class="flex-1 relative">
+            <input type="text" id="searchInput" placeholder="Search tags..." 
+                   class="w-full bg-zinc-800 border border-zinc-700 rounded-lg pl-10 pr-4 py-2.5 focus:outline-none focus:border-indigo-500 transition text-sm">
+            <svg class="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+            </svg>
+          </div>
+          <button onclick="openCreateModal()" class="bg-indigo-600 hover:bg-indigo-700 px-4 py-2.5 rounded-lg font-medium text-sm transition flex items-center justify-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            Add New Tag
+          </button>
+        </div>
+
+        <!-- Stats -->
+        <div class="flex gap-4 mb-4 text-sm text-zinc-500">
+          <span id="tagCount">0 tags</span>
+          <span id="totalUses">0 total uses</span>
+        </div>
+
+        <!-- Tags Table -->
+        <div class="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full">
+              <thead class="bg-zinc-800/50 text-left text-sm">
+                <tr>
+                  <th class="px-4 py-3 font-medium text-zinc-400 w-48">Tag</th>
+                  <th class="px-4 py-3 font-medium text-zinc-400">Response</th>
+                  <th class="px-4 py-3 font-medium text-zinc-400 w-32">Owner</th>
+                  <th class="px-4 py-3 font-medium text-zinc-400 w-20 text-center">Uses</th>
+                  <th class="px-4 py-3 font-medium text-zinc-400 w-20 text-center">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="tagsTableBody" class="divide-y divide-zinc-800">
+                <tr>
+                  <td colspan="5" class="px-4 py-12 text-center text-zinc-500">Loading tags...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Empty State -->
+        <div id="emptyState" class="hidden bg-zinc-900 rounded-xl border border-zinc-800 p-12 text-center">
+          <div class="text-4xl mb-4">🏷️</div>
+          <h3 class="text-lg font-semibold mb-2">No tags yet</h3>
+          <p class="text-zinc-400 mb-6 text-sm">Create your first tag to get started!</p>
+          <button onclick="openCreateModal()" class="bg-indigo-600 hover:bg-indigo-700 px-6 py-2.5 rounded-lg font-medium text-sm transition">
+            Create First Tag
+          </button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Create/Edit Modal -->
+  <div id="tagModal" class="fixed inset-0 z-50 hidden">
+    <div class="modal-backdrop absolute inset-0 bg-black/60" onclick="closeModal()"></div>
+    <div class="modal-content absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg bg-zinc-900 rounded-xl border border-zinc-800 shadow-2xl">
+      <div class="flex items-center justify-between p-4 border-b border-zinc-800">
+        <h3 id="modalTitle" class="text-lg font-semibold">Add New Tag</h3>
+        <button onclick="closeModal()" class="text-zinc-400 hover:text-white transition">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+      <form id="tagForm" class="p-4 space-y-4">
+        <input type="hidden" id="tagId" value="">
+        
+        <div>
+          <label for="tagName" class="block text-sm font-medium mb-2">Tag Name</label>
+          <input type="text" id="tagName" name="name" maxlength="32" required
+                 class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 focus:outline-none focus:border-indigo-500 transition"
+                 placeholder="e.g., rules, faq, welcome">
+          <p class="text-xs text-zinc-500 mt-1.5">Max 32 characters, no spaces (use hyphens or underscores)</p>
+        </div>
+        
+        <div>
+          <label for="tagResponse" class="block text-sm font-medium mb-2">Response</label>
+          <textarea id="tagResponse" name="response" maxlength="2000" rows="8" required
+                    class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 focus:outline-none focus:border-indigo-500 transition resize-none"
+                    placeholder="Enter the tag response... You can use Discord markdown, emojis, and links."></textarea>
+          <div class="flex justify-between text-xs text-zinc-500 mt-1.5">
+            <span>Supports Discord markdown and emojis</span>
+            <span><span id="charCount">0</span>/2000</span>
+          </div>
+        </div>
+        
+        <div id="modalStatus" class="px-4 py-3 rounded-lg text-sm hidden"></div>
+        
+        <div class="flex gap-3 pt-2">
+          <button type="button" onclick="closeModal()" class="flex-1 bg-zinc-800 hover:bg-zinc-700 px-4 py-2.5 rounded-lg font-medium transition">
+            Cancel
+          </button>
+          <button type="submit" id="submitBtn" class="flex-1 bg-indigo-600 hover:bg-indigo-700 px-4 py-2.5 rounded-lg font-medium transition">
+            Create Tag
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Delete Confirmation Modal -->
+  <div id="deleteModal" class="fixed inset-0 z-50 hidden">
+    <div class="modal-backdrop absolute inset-0 bg-black/60" onclick="closeDeleteModal()"></div>
+    <div class="modal-content absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-zinc-900 rounded-xl border border-zinc-800 shadow-2xl p-6">
+      <div class="text-center">
+        <div class="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg class="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+          </svg>
+        </div>
+        <h3 class="text-lg font-semibold mb-2">Delete Tag</h3>
+        <p class="text-zinc-400 text-sm mb-6">Are you sure you want to delete <strong id="deleteTagName" class="text-white"></strong>? This action cannot be undone.</p>
+        <div class="flex gap-3">
+          <button onclick="closeDeleteModal()" class="flex-1 bg-zinc-800 hover:bg-zinc-700 px-4 py-2.5 rounded-lg font-medium transition">
+            Cancel
+          </button>
+          <button onclick="confirmDelete()" class="flex-1 bg-red-600 hover:bg-red-700 px-4 py-2.5 rounded-lg font-medium transition">
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let tags = [];
+    let deleteTagId = null;
+
+    function onGuildReady(data) {
+      loadTags();
+      loadPermissionTier();
+    }
+
+    async function loadPermissionTier() {
+      try {
+        const response = await fetch(`/api/guilds/${guildId}/settings`);
+        const settings = await response.json();
+        const manageOwn = settings.tags_manage_own || 'users';
+        const manageAll = settings.tags_manage_all || 'admins';
+        const value = `${manageOwn}-${manageAll}`;
+        document.getElementById('permissionTier').value = value;
+      } catch (error) {
+        console.error('Failed to load permission tier:', error);
+      }
+    }
+
+    async function savePermissionTier() {
+      const select = document.getElementById('permissionTier');
+      const [manageOwn, manageAll] = select.value.split('-');
+      
+      try {
+        const res = await fetch(`/api/guilds/${guildId}/settings`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tags_manage_own: manageOwn,
+            tags_manage_all: manageAll
+          })
+        });
+        
+        if (res.ok) {
+          // Show brief success feedback
+          select.classList.add('border-green-500');
+          setTimeout(() => select.classList.remove('border-green-500'), 1500);
+        }
+      } catch (error) {
+        console.error('Failed to save permission tier:', error);
+      }
+    }
+
+    async function loadTags() {
+      try {
+        const response = await fetch(`/api/guilds/${guildId}/tags`);
+        tags = await response.json();
+        renderTags();
+        updateStats();
+      } catch (error) {
+        console.error('Failed to load tags:', error);
+      }
+    }
+
+    function renderTags(filter = '') {
+      const tbody = document.getElementById('tagsTableBody');
+      const emptyState = document.getElementById('emptyState');
+      const table = tbody.closest('.bg-zinc-900');
+      
+      const filtered = tags.filter(tag => 
+        tag.name.toLowerCase().includes(filter.toLowerCase()) ||
+        tag.response.toLowerCase().includes(filter.toLowerCase())
+      );
+      
+      if (tags.length === 0) {
+        table.classList.add('hidden');
+        emptyState.classList.remove('hidden');
+        return;
+      }
+      
+      table.classList.remove('hidden');
+      emptyState.classList.add('hidden');
+      
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="px-4 py-12 text-center text-zinc-500">No tags match your search</td></tr>`;
+        return;
+      }
+      
+      tbody.innerHTML = filtered.map(tag => `
+        <tr class="tag-row">
+          <td class="px-4 py-3">
+            <code class="bg-zinc-800 px-2 py-1 rounded text-indigo-400 text-sm">/tag name:${escapeHtml(tag.name)}</code>
+          </td>
+          <td class="px-4 py-3">
+            <div class="response-preview text-sm text-zinc-300">${escapeHtml(tag.response)}</div>
+          </td>
+          <td class="px-4 py-3 text-sm text-zinc-400">${escapeHtml(tag.owner_name)}</td>
+          <td class="px-4 py-3 text-sm text-zinc-400 text-center">${tag.uses}</td>
+          <td class="px-4 py-3 text-center">
+            <div class="flex items-center justify-center gap-1">
+              <button onclick="openEditModal(${tag.id})" class="p-1.5 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded transition" title="Edit">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                </svg>
+              </button>
+              <button onclick="openDeleteModal(${tag.id}, '${escapeHtml(tag.name)}')" class="p-1.5 text-zinc-400 hover:text-red-400 hover:bg-zinc-800 rounded transition" title="Delete">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                </svg>
+              </button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function updateStats() {
+      document.getElementById('tagCount').textContent = `${tags.length} tag${tags.length !== 1 ? 's' : ''}`;
+      const totalUses = tags.reduce((sum, tag) => sum + tag.uses, 0);
+      document.getElementById('totalUses').textContent = `${totalUses} total use${totalUses !== 1 ? 's' : ''}`;
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    // Search
+    document.getElementById('searchInput').addEventListener('input', (e) => {
+      renderTags(e.target.value);
+    });
+
+    // Character counter
+    document.getElementById('tagResponse').addEventListener('input', (e) => {
+      document.getElementById('charCount').textContent = e.target.value.length;
+    });
+
+    // Modal functions
+    function openCreateModal() {
+      document.getElementById('modalTitle').textContent = 'Add New Tag';
+      document.getElementById('submitBtn').textContent = 'Create Tag';
+      document.getElementById('tagId').value = '';
+      document.getElementById('tagName').value = '';
+      document.getElementById('tagResponse').value = '';
+      document.getElementById('charCount').textContent = '0';
+      document.getElementById('modalStatus').classList.add('hidden');
+      document.getElementById('tagModal').classList.remove('hidden');
+      document.getElementById('tagName').focus();
+    }
+
+    function openEditModal(id) {
+      const tag = tags.find(t => t.id === id);
+      if (!tag) return;
+      
+      document.getElementById('modalTitle').textContent = 'Edit Tag';
+      document.getElementById('submitBtn').textContent = 'Save Changes';
+      document.getElementById('tagId').value = tag.id;
+      document.getElementById('tagName').value = tag.name;
+      document.getElementById('tagResponse').value = tag.response;
+      document.getElementById('charCount').textContent = tag.response.length;
+      document.getElementById('modalStatus').classList.add('hidden');
+      document.getElementById('tagModal').classList.remove('hidden');
+      document.getElementById('tagName').focus();
+    }
+
+    function closeModal() {
+      document.getElementById('tagModal').classList.add('hidden');
+    }
+
+    function openDeleteModal(id, name) {
+      deleteTagId = id;
+      document.getElementById('deleteTagName').textContent = `/tag ${name}`;
+      document.getElementById('deleteModal').classList.remove('hidden');
+    }
+
+    function closeDeleteModal() {
+      deleteTagId = null;
+      document.getElementById('deleteModal').classList.add('hidden');
+    }
+
+    async function confirmDelete() {
+      if (!deleteTagId) return;
+      
+      try {
+        const response = await fetch(`/api/guilds/${guildId}/tags/${deleteTagId}`, {
+          method: 'DELETE'
+        });
+        
+        if (response.ok) {
+          closeDeleteModal();
+          loadTags();
+        } else {
+          const data = await response.json();
+          alert(data.error || 'Failed to delete tag');
+        }
+      } catch (error) {
+        console.error('Failed to delete tag:', error);
+        alert('Failed to delete tag');
+      }
+    }
+
+    // Form submission
+    document.getElementById('tagForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const status = document.getElementById('modalStatus');
+      const tagId = document.getElementById('tagId').value;
+      const name = document.getElementById('tagName').value.trim().replace(/\s+/g, '-').toLowerCase();
+      const response = document.getElementById('tagResponse').value.trim();
+      
+      if (!name || !response) {
+        status.textContent = 'Please fill in all fields';
+        status.className = 'px-4 py-3 rounded-lg text-sm bg-red-500/20 text-red-400';
+        return;
+      }
+      
+      const isEdit = !!tagId;
+      const url = isEdit ? `/api/guilds/${guildId}/tags/${tagId}` : `/api/guilds/${guildId}/tags`;
+      const method = isEdit ? 'PATCH' : 'POST';
+      
+      try {
+        const res = await fetch(url, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, response })
+        });
+        
+        const data = await res.json();
+        
+        if (res.ok) {
+          closeModal();
+          loadTags();
+        } else {
+          status.textContent = data.error || 'Failed to save tag';
+          status.className = 'px-4 py-3 rounded-lg text-sm bg-red-500/20 text-red-400';
+        }
+      } catch (error) {
+        console.error('Failed to save tag:', error);
+        status.textContent = 'Failed to save tag';
+        status.className = 'px-4 py-3 rounded-lg text-sm bg-red-500/20 text-red-400';
+      }
+    });
+
+    // Close modals on escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeModal();
+        closeDeleteModal();
+      }
+    });
+  </script>
+  <%- include('partials/scripts/guild-loader') %>
+</body>
+</html>

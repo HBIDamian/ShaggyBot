@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <%- include('partials/head') %>
+  <style>
+    /* Landing page specific styles */
+    .hero-gradient {
+      background: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(99, 102, 241, 0.15), transparent);
+    }
+    .glow {
+      filter: drop-shadow(0 0 30px rgba(99, 102, 241, 0.4));
+    }
+    .feature-card {
+      transition: all 0.3s ease;
+    }
+    .feature-card:hover {
+      transform: translateY(-4px);
+      border-color: rgb(99 102 241 / 0.5);
+      box-shadow: 0 20px 40px -20px rgba(99, 102, 241, 0.3);
+    }
+    .animate-float {
+      animation: float 6s ease-in-out infinite;
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-20px); }
+    }
+    .animate-pulse-slow {
+      animation: pulse-slow 4s ease-in-out infinite;
+    }
+    @keyframes pulse-slow {
+      0%, 100% { opacity: 0.4; }
+      50% { opacity: 0.8; }
+    }
+    .text-gradient {
+      background: linear-gradient(135deg, #818cf8 0%, #c084fc 50%, #f472b6 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+      transition: all 0.3s ease;
+    }
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 30px -10px rgba(99, 102, 241, 0.5);
+    }
+    .stat-card {
+      background: linear-gradient(135deg, rgba(39, 39, 42, 0.8) 0%, rgba(24, 24, 27, 0.8) 100%);
+      backdrop-filter: blur(10px);
+    }
+    img[src="/static/img/Shaggy.png"] {
+      object-fit: cover;
+      image-rendering: auto;
+    }
+    /* .squircle is defined in partials/head.ejs */
+  </style>
+</head>
+<body class="bg-zinc-950 text-white min-h-screen overflow-x-hidden">
+  <%- include('partials/navbar') %>
+
+  <!-- Hero Section -->
+  <section class="hero-gradient relative min-h-[90vh] flex items-center justify-center text-center px-4 md:px-6 pt-12 pb-24">
+    <!-- Background decorations -->
+    <div class="absolute inset-0 overflow-hidden pointer-events-none">
+      <div class="absolute top-20 left-10 w-72 h-72 bg-indigo-500/10 rounded-full blur-3xl animate-pulse-slow"></div>
+      <div class="absolute bottom-20 right-10 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse-slow" style="animation-delay: 2s;"></div>
+    </div>
+
+    <div class="relative z-10 max-w-5xl w-full">
+      <!-- Logo -->
+      <div class="mb-8 animate-float">
+        <img src="/static/img/Shaggy.png" alt="ShaggyBot" class="squircle w-64 h-64 md:w-72 md:h-72 rounded-3xl mx-auto" onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'">
+      </div>
+
+      <!-- Title -->
+      <h1 class="text-5xl md:text-7xl font-black mb-6 tracking-tight">
+        <span class="text-gradient">ShaggyBot</span>
+      </h1>
+
+      <!-- Tagline -->
+      <p class="text-xl md:text-2xl text-zinc-300 mb-4 font-medium">
+        Multi-purpose Discord Bot.
+      </p>
+      <p class="text-lg md:text-xl text-zinc-500 mb-12 max-w-2xl mx-auto">
+        Powerful auto-moderation. Comprehensive logging. Fully customizable. Completely free.
+      </p>
+
+      <!-- CTA Buttons -->
+      <div class="flex gap-4 justify-center flex-wrap mb-16">
+        <a href="https://discord.com/oauth2/authorize?client_id=1244317549051510855&permissions=8&scope=bot%20applications.commands" 
+           class="btn-primary px-8 py-4 rounded-xl font-bold text-lg flex items-center gap-3" target="_blank">
+          <svg class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/>
+          </svg>
+          Add to Discord
+        </a>
+        <a href="/dashboard" id="ctaDashboard" class="hidden bg-zinc-800 hover:bg-zinc-700 px-8 py-4 rounded-xl font-bold text-lg border border-zinc-700 transition">
+          Open Dashboard
+        </a>
+        <a href="/auth/login" id="ctaLogin" class="bg-zinc-800 hover:bg-zinc-700 px-8 py-4 rounded-xl font-bold text-lg border border-zinc-700 transition flex items-center gap-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/>
+          </svg>
+          Dashboard Login
+        </a>
+      </div>
+
+      <!-- Stats -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-3xl mx-auto">
+        <div class="stat-card rounded-xl p-4 border border-zinc-800">
+          <div class="text-3xl md:text-4xl font-black text-gradient" id="statServers">-</div>
+          <div class="text-sm text-zinc-500 mt-1">Servers</div>
+        </div>
+        <div class="stat-card rounded-xl p-4 border border-zinc-800">
+          <div class="text-3xl md:text-4xl font-black text-gradient" id="statUsers">-</div>
+          <div class="text-sm text-zinc-500 mt-1">Users</div>
+        </div>
+        <div class="stat-card rounded-xl p-4 border border-zinc-800">
+          <div class="text-3xl md:text-4xl font-black text-gradient">15+</div>
+          <div class="text-sm text-zinc-500 mt-1">Commands</div>
+        </div>
+        <div class="stat-card rounded-xl p-4 border border-zinc-800">
+          <div class="text-3xl md:text-4xl font-black text-gradient">99.9%</div>
+          <div class="text-sm text-zinc-500 mt-1">Uptime</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features Section -->
+  <section class="py-24 px-4 md:px-6 relative">
+    <div class="max-w-6xl mx-auto">
+      <div class="text-center mb-16">
+        <h2 class="text-3xl md:text-5xl font-black mb-4">Highly Customizable Features</h2>
+        <p class="text-lg text-zinc-500 max-w-2xl mx-auto">Every feature of ShaggyBot is designed to be flexible and powerful. Configure everything through our intuitive dashboard.</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <!-- Auto Moderation -->
+        <div class="feature-card bg-zinc-900/50 p-6 rounded-2xl border border-zinc-800">
+          <div class="w-12 h-12 bg-indigo-500/20 rounded-xl flex items-center justify-center mb-4">
+            <span class="text-2xl">🛡️</span>
+          </div>
+          <h3 class="text-xl font-bold mb-2">Auto Moderation</h3>
+          <p class="text-zinc-400 mb-4">Protect your server with 10+ auto-mod modules including spam detection, phishing protection, and word filters.</p>
+          <ul class="space-y-2 text-sm text-zinc-500">
+            <li class="flex items-center gap-2">
+              <svg class="w-4 h-4 text-indigo-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+              876,000+ phishing domains blocked
+            </li>
+            <li class="flex items-center gap-2">
+              <svg class="w-4 h-4 text-indigo-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+              Customizable punishment actions
+            </li>
+            <li class="flex items-center gap-2">
+              <svg class="w-4 h-4 text-indigo-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+              Role & channel exemptions
+            </li>
+          </ul>
+        </div>
+
+        <!-- Audit Logging -->
+        <div class="feature-card bg-zinc-900/50 p-6 rounded-2xl border border-zinc-800">
+          <div class="w-12 h-12 bg-purple-500/20 rounded-xl flex items-center justify-center mb-4">
+            <span class="text-2xl">📋</span>
+          </div>
+          <h3 class="text-xl font-bold mb-2">Comprehensive Logging</h3>
+          <p class="text-zinc-400 mb-4">Monitor every action in your server with detailed audit logs and customizable notifications.</p>
+          <ul class="space-y-2 text-sm text-zinc-500">
+            <li class="flex items-center gap-2">
+              <svg class="w-4 h-4 text-purple-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+              25+ event types
+            </li>
+            <li class="flex items-center gap-2">
+              <svg class="w-4 h-4 text-purple-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+              Custom embed colors
+            </li>
+            <li class="flex items-center gap-2">
+              <svg class="w-4 h-4 text-purple-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+              Per-channel configuration
+            </li>
+          </ul>
+        </div>
+
+        <!-- Moderation Tools -->
+        <div class="feature-card bg-zinc-900/50 p-6 rounded-2xl border border-zinc-800">
+          <div class="w-12 h-12 bg-pink-500/20 rounded-xl flex items-center justify-center mb-4">
+            <span class="text-2xl">🔨</span>
+          </div>
+          <h3 class="text-xl font-bold mb-2">Moderation Tools</h3>
+          <p class="text-zinc-400 mb-4">Powerful moderation commands with warning thresholds and automatic escalation.</p>
+          <ul class="space-y-2 text-sm text-zinc-500">
+            <li class="flex items-center gap-2">
+              <svg class="w-4 h-4 text-pink-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+              Warning system with auto-actions
+            </li>
+            <li class="flex items-center gap-2">
+              <svg class="w-4 h-4 text-pink-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+              Message reporting system
+            </li>
+            <li class="flex items-center gap-2">
+              <svg class="w-4 h-4 text-pink-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+              Persistent mute support
+            </li>
+          </ul>
+        </div>
+
+        <!-- Message Features -->
+        <div class="feature-card bg-zinc-900/50 p-6 rounded-2xl border border-zinc-800">
+          <div class="w-12 h-12 bg-cyan-500/20 rounded-xl flex items-center justify-center mb-4">
+            <span class="text-2xl">💬</span>
+          </div>
+          <h3 class="text-xl font-bold mb-2">Message Features</h3>
+          <p class="text-zinc-400 mb-4">Enhanced messaging with auto-quote previews and GitHub code embedding.</p>
+          <ul class="space-y-2 text-sm text-zinc-500">
+            <li class="flex items-center gap-2">
+              <svg class="w-4 h-4 text-cyan-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+              Auto message quoter
+            </li>
+            <li class="flex items-center gap-2">
+              <svg class="w-4 h-4 text-cyan-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+              GitHub code previewer
+            </li>
+            <li class="flex items-center gap-2">
+              <svg class="w-4 h-4 text-cyan-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+              Syntax highlighting
+            </li>
+          </ul>
+        </div>
+
+        <!-- Welcome System -->
+        <div class="feature-card bg-zinc-900/50 p-6 rounded-2xl border border-zinc-800">
+          <div class="w-12 h-12 bg-green-500/20 rounded-xl flex items-center justify-center mb-4">
+            <span class="text-2xl">👋</span>
+          </div>
+          <h3 class="text-xl font-bold mb-2">Welcome System</h3>
+          <p class="text-zinc-400 mb-4">Greet new members with customizable welcome messages and auto-role assignment.</p>
+          <ul class="space-y-2 text-sm text-zinc-500">
+            <li class="flex items-center gap-2">
+              <svg class="w-4 h-4 text-green-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+              Custom welcome/leave messages
+            </li>
+            <li class="flex items-center gap-2">
+              <svg class="w-4 h-4 text-green-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+              Auto-role on join
+            </li>
+            <li class="flex items-center gap-2">
+              <svg class="w-4 h-4 text-green-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+              Variable placeholders
+            </li>
+          </ul>
+        </div>
+
+        <!-- Web Dashboard -->
+        <div class="feature-card bg-zinc-900/50 p-6 rounded-2xl border border-zinc-800">
+          <div class="w-12 h-12 bg-amber-500/20 rounded-xl flex items-center justify-center mb-4">
+            <span class="text-2xl">⚙️</span>
+          </div>
+          <h3 class="text-xl font-bold mb-2">Web Dashboard</h3>
+          <p class="text-zinc-400 mb-4">Configure everything through our modern, mobile-friendly web dashboard.</p>
+          <ul class="space-y-2 text-sm text-zinc-500">
+            <li class="flex items-center gap-2">
+              <svg class="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+              Mobile-friendly design
+            </li>
+            <li class="flex items-center gap-2">
+              <svg class="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+              Real-time updates
+            </li>
+            <li class="flex items-center gap-2">
+              <svg class="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+              Discord OAuth login
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA Section -->
+  <section class="py-24 px-4 md:px-6 relative">
+    <div class="absolute inset-0 bg-gradient-to-b from-transparent via-indigo-500/5 to-transparent"></div>
+    <div class="max-w-4xl mx-auto text-center relative z-10">
+      <h2 class="text-3xl md:text-5xl font-black mb-6">Ready to upgrade your server?</h2>
+      <p class="text-lg text-zinc-400 mb-10 max-w-2xl mx-auto">Join the servers already using ShaggyBot to keep their communities safe and organized.</p>
+      
+      <div class="flex gap-4 justify-center flex-wrap">
+        <a href="https://discord.com/oauth2/authorize?client_id=1244317549051510855&permissions=8&scope=bot%20applications.commands" 
+           class="btn-primary px-8 py-4 rounded-xl font-bold text-lg flex items-center gap-3" target="_blank">
+          <svg class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/>
+          </svg>
+          Add to Discord
+        </a>
+        <a href="https://discord.gg/YOUR_SUPPORT_SERVER" class="bg-zinc-800 hover:bg-zinc-700 px-8 py-4 rounded-xl font-bold text-lg border border-zinc-700 transition" target="_blank">
+          Support Server
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="border-t border-zinc-800 py-12 px-4 md:px-6">
+    <div class="max-w-6xl mx-auto">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-8 mb-12">
+        <!-- Brand -->
+        <div class="md:col-span-2">
+          <div class="flex items-center gap-3 mb-4">
+            <img src="/static/img/logo.png" alt="ShaggyBot" class="w-10 h-10 rounded-xl" onerror="this.style.display='none'">
+            <span class="text-xl font-bold">ShaggyBot</span>
+          </div>
+          <p class="text-zinc-500 text-sm mb-4 max-w-sm">A Discord Bot — Done Right. Powerful moderation, comprehensive logging, and complete customization.</p>
+          <p class="text-zinc-600 text-xs">Like, zoinks!</p>
+        </div>
+
+        <!-- Navigation -->
+        <div>
+          <h4 class="font-semibold mb-4 text-zinc-300">Navigation</h4>
+          <ul class="space-y-2 text-sm text-zinc-500">
+            <li><a href="/" class="hover:text-white transition">Home</a></li>
+            <li><a href="/dashboard" class="hover:text-white transition">Dashboard</a></li>
+          </ul>
+        </div>
+
+        <!-- Links -->
+        <div>
+          <h4 class="font-semibold mb-4 text-zinc-300">Links</h4>
+          <ul class="space-y-2 text-sm text-zinc-500">
+            <li><a href="https://discord.com/oauth2/authorize?client_id=1244317549051510855&permissions=8&scope=bot%20applications.commands" target="_blank" class="hover:text-white transition">Invite Bot</a></li>
+            <li><a href="https://discord.gg/YOUR_SUPPORT_SERVER" target="_blank" class="hover:text-white transition">Support Server</a></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="border-t border-zinc-800 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
+        <p class="text-zinc-600 text-sm">&copy; <%= new Date().getFullYear() %> ShaggyBot. Not affiliated with Discord Inc.</p>
+        <div class="flex gap-4">
+          <a href="https://discord.gg/YOUR_SUPPORT_SERVER" target="_blank" class="text-zinc-500 hover:text-white transition">
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/>
+            </svg>
+          </a>
+          <a href="https://github.com" target="_blank" class="text-zinc-500 hover:text-white transition">
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+            </svg>
+          </a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    function onAuthReady(user) {
+      document.getElementById('ctaLogin').classList.add('hidden');
+      document.getElementById('ctaDashboard').classList.remove('hidden');
+    }
+
+    // Fetch bot stats
+    fetch('/api/stats').then(r => r.json()).then(data => {
+      if (data.guilds) document.getElementById('statServers').textContent = data.guilds.toLocaleString();
+      if (data.users) document.getElementById('statUsers').textContent = (data.users / 1000).toFixed(1) + 'K';
+    }).catch(() => {
+      document.getElementById('statServers').textContent = '2';
+      document.getElementById('statUsers').textContent = '100+';
+    });
+  </script>
+  <%- include('partials/scripts/auth-check') %>
+</body>
+</html>

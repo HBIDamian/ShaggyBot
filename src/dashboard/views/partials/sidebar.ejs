@@ -1,0 +1,89 @@
+<!-- Mobile Sidebar Overlay -->
+<div id="sidebarOverlay" class="fixed inset-0 bg-black/50 z-40 lg:hidden hidden" onclick="toggleMobileSidebar()"></div>
+
+<!-- Sidebar -->
+<aside id="sidebar" class="fixed top-[65px] left-0 w-72 bg-zinc-900 border-r border-zinc-800 p-4 flex-shrink-0 overflow-y-auto h-[calc(100vh-65px)] z-40 transform -translate-x-full lg:translate-x-0 transition-transform duration-300">
+  <!-- Mobile close button -->
+  <button class="lg:hidden absolute top-4 right-4 p-1 text-zinc-400 hover:text-white" onclick="toggleMobileSidebar()">
+    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+    </svg>
+  </button>
+  
+  <div class="text-center pb-4 border-b border-zinc-800 mb-4">
+    <img id="guildIcon" class="w-16 h-16 rounded-full mx-auto mb-2" alt="Server">
+    <h2 id="guildName" class="font-bold text-lg truncate">Loading...</h2>
+    <p id="guildMemberCount" class="text-sm text-zinc-400"></p>
+  </div>
+  
+  <!-- General Settings Category -->
+  <div class="mb-4">
+    <h3 class="text-xs font-semibold text-zinc-500 uppercase tracking-wider px-3 mb-2">General Settings</h3>
+    <nav class="space-y-1">
+      <a href="#" onclick="navigateTo(''); return false;" class="sidebar-link flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition <%= typeof activeSection !== 'undefined' && activeSection === 'settings' ? 'bg-indigo-600 text-white font-medium' : 'text-zinc-400 hover:bg-zinc-800 hover:text-white' %>">
+        <span>⚙️</span> Bot Settings
+      </a>
+    </nav>
+  </div>
+
+  <!-- Moderation Category -->
+  <div class="mb-4">
+    <h3 class="text-xs font-semibold text-zinc-500 uppercase tracking-wider px-3 mb-2">Moderation</h3>
+    <nav class="space-y-1">
+      <a href="#" onclick="navigateTo('/antiraid'); return false;" class="sidebar-link flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition <%= typeof activeSection !== 'undefined' && activeSection === 'antiraid' ? 'bg-indigo-600 text-white font-medium' : 'text-zinc-400 hover:bg-zinc-800 hover:text-white' %>">
+        <span>🛡️</span> Anti-Raid
+      </a>
+      <a href="#" onclick="navigateTo('/auditlog'); return false;" class="sidebar-link flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition <%= typeof activeSection !== 'undefined' && activeSection === 'auditlog' ? 'bg-indigo-600 text-white font-medium' : 'text-zinc-400 hover:bg-zinc-800 hover:text-white' %>">
+        <span>📋</span> Audit Log
+      </a>
+      <a href="#" onclick="navigateTo('/automod'); return false;" class="sidebar-link flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition <%= typeof activeSection !== 'undefined' && activeSection === 'automod' ? 'bg-indigo-600 text-white font-medium' : 'text-zinc-400 hover:bg-zinc-800 hover:text-white' %>">
+        <span>🤖</span> Auto Mod
+      </a>
+      <a href="#" onclick="navigateTo('/lockdown'); return false;" class="sidebar-link flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition <%= typeof activeSection !== 'undefined' && activeSection === 'lockdown' ? 'bg-indigo-600 text-white font-medium' : 'text-zinc-400 hover:bg-zinc-800 hover:text-white' %>">
+        <span>🔒</span> Lockdown
+      </a>
+      <a href="#" onclick="navigateTo('/logs'); return false;" class="sidebar-link flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition <%= typeof activeSection !== 'undefined' && activeSection === 'logs' ? 'bg-indigo-600 text-white font-medium' : 'text-zinc-400 hover:bg-zinc-800 hover:text-white' %>">
+        <span>📜</span> Logs
+      </a>
+      <a href="#" onclick="navigateTo('/moderation'); return false;" class="sidebar-link flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition <%= typeof activeSection !== 'undefined' && activeSection === 'moderation' ? 'bg-indigo-600 text-white font-medium' : 'text-zinc-400 hover:bg-zinc-800 hover:text-white' %>">
+        <span>🔨</span> Moderation
+      </a>
+    </nav>
+  </div>
+
+  <!-- Features Category -->
+  <div class="mb-4">
+    <h3 class="text-xs font-semibold text-zinc-500 uppercase tracking-wider px-3 mb-2">Features</h3>
+    <nav class="space-y-1">
+      <a href="#" onclick="navigateTo('/starboard'); return false;" class="sidebar-link flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition <%= typeof activeSection !== 'undefined' && activeSection === 'starboard' ? 'bg-indigo-600 text-white font-medium' : 'text-zinc-400 hover:bg-zinc-800 hover:text-white' %>">
+        <span>⭐</span> Starboard
+      </a>
+      <a href="#" onclick="navigateTo('/tags'); return false;" class="sidebar-link flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition <%= typeof activeSection !== 'undefined' && activeSection === 'tags' ? 'bg-indigo-600 text-white font-medium' : 'text-zinc-400 hover:bg-zinc-800 hover:text-white' %>">
+        <span>🏷️</span> Tags
+      </a>
+      <a href="#" onclick="navigateTo('/trolldiscourager'); return false;" class="sidebar-link flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition <%= typeof activeSection !== 'undefined' && activeSection === 'trolldiscourager' ? 'bg-indigo-600 text-white font-medium' : 'text-zinc-400 hover:bg-zinc-800 hover:text-white' %>">
+        <span>🤡</span> Troll Discourager
+      </a>
+    </nav>
+  </div>
+</aside>
+
+<script>
+  // Show mobile menu button on pages with sidebar
+  document.getElementById('mobileMenuBtn')?.classList.remove('hidden');
+  
+  function toggleMobileSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+    
+    if (sidebar.classList.contains('-translate-x-full')) {
+      sidebar.classList.remove('-translate-x-full');
+      overlay.classList.remove('hidden');
+      document.body.classList.add('overflow-hidden', 'lg:overflow-auto');
+    } else {
+      sidebar.classList.add('-translate-x-full');
+      overlay.classList.add('hidden');
+      document.body.classList.remove('overflow-hidden', 'lg:overflow-auto');
+    }
+  }
+</script>

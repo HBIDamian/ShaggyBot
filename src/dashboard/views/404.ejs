@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title: '404 - Page Not Found' }) %>
+</head>
+<body class="bg-zinc-950 text-white min-h-screen">
+  <%- include('partials/background') %>
+  <%- include('partials/navbar', { activePage: '' }) %>
+
+  <main class="min-h-[calc(100vh-65px)] flex items-center justify-center text-center px-6 relative z-10">
+    <div>
+      <h1 class="text-8xl font-bold text-indigo-500 mb-4">404</h1>
+      <h2 class="text-2xl font-semibold mb-4">Like, zoinks! Page not found!</h2>
+      <p class="text-zinc-400 mb-8">The page you're looking for doesn't exist or has been moved.</p>
+      <a href="/" class="bg-indigo-600 hover:bg-indigo-700 px-6 py-3 rounded-lg font-semibold transition">
+        Go Home
+      </a>
+    </div>
+  </main>
+
+  <%- include('partials/scripts/auth-check') %>
+</body>
+</html>

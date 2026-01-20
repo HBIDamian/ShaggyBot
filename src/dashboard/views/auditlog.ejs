@@ -1,0 +1,1764 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title: title }) %>
+  <style>
+    .color-preview {
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      border: 2px solid rgba(255,255,255,0.1);
+      cursor: pointer;
+    }
+    .color-input {
+      opacity: 0;
+      position: absolute;
+      width: 32px;
+      height: 32px;
+      cursor: pointer;
+    }
+    .event-card {
+      transition: all 0.2s ease;
+    }
+    .event-card:hover {
+      border-color: rgba(99, 102, 241, 0.5);
+    }
+    .category-header {
+      cursor: pointer;
+      user-select: none;
+    }
+    .category-header:hover {
+      background-color: rgba(255,255,255,0.03);
+    }
+    .category-content {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease-out;
+    }
+    .category-content.open {
+      max-height: 2000px;
+    }
+    .chevron {
+      transition: transform 0.2s ease;
+    }
+    .chevron.open {
+      transform: rotate(180deg);
+    }
+  </style>
+</head>
+<body class="bg-zinc-950 text-white min-h-screen guild-page">
+  <%- include('partials/background') %>
+  <%- include('partials/navbar', { requiresAuth: true, activePage: 'dashboard' }) %>
+
+  <div class="flex min-h-[calc(100vh-65px)] relative z-10">
+    <%- include('partials/sidebar', { activeSection: 'auditlog' }) %>
+
+    <!-- Main Content -->
+    <main class="flex-1 p-4 md:p-8 overflow-y-auto lg:ml-72">
+      <div class="max-w-6xl mx-auto">
+        <div class="mb-6 md:mb-8">
+          <h1 class="text-xl md:text-2xl font-bold mb-2">Audit Log</h1>
+          <p class="text-zinc-400 text-sm md:text-base">Configure which server events are logged and where they're sent.</p>
+        </div>
+
+        <!-- Master Toggle -->
+        <div class="bg-indigo-600/20 border border-indigo-500 p-6 rounded-xl mb-6">
+          <div class="flex justify-between items-center">
+            <div>
+              <h3 class="font-semibold text-lg">Enable Audit Logging</h3>
+              <p class="text-sm text-zinc-400">Master switch for all audit log features</p>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" id="masterEnabled" class="sr-only peer">
+              <div class="w-14 h-7 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-indigo-600"></div>
+            </label>
+          </div>
+        </div>
+
+        <!-- Global Settings -->
+        <div class="bg-zinc-900 p-6 rounded-xl border border-zinc-800 mb-6">
+          <h3 class="font-semibold mb-4 flex items-center gap-2">
+            <span class="text-xl">⚙️</span> Global Settings
+          </h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label class="block text-sm font-medium mb-2">Ignored Roles</label>
+              <select id="ignored_roles" multiple data-placeholder="Select roles to ignore..."
+                      class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 focus:outline-none focus:border-indigo-500 transition min-h-[100px] role-select">
+              </select>
+              <p class="text-xs text-zinc-500 mt-1.5">Events from users with these roles won't be logged</p>
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-2">Ignored Channels</label>
+              <select id="ignored_channels" multiple data-placeholder="Select channels to ignore..."
+                      class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 focus:outline-none focus:border-indigo-500 transition min-h-[100px] channel-select">
+              </select>
+              <p class="text-xs text-zinc-500 mt-1.5">Events from these channels won't be logged</p>
+            </div>
+          </div>
+          
+          <!-- Batch Channel Setter -->
+          <div class="mt-6 pt-6 border-t border-zinc-700">
+            <h4 class="font-medium mb-3 flex items-center gap-2">
+              <span>📢</span> Set All Log Channels
+            </h4>
+            <p class="text-sm text-zinc-400 mb-3">Quickly set all event log channels to a single channel at once.</p>
+            <div class="flex flex-col sm:flex-row gap-3">
+              <select id="batch_channel" class="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 focus:outline-none focus:border-indigo-500 transition channel-select">
+                <option value="">Select a channel...</option>
+              </select>
+              <button onclick="showBatchConfirmDialog()" class="bg-indigo-600 hover:bg-indigo-700 px-6 py-2.5 rounded-lg font-medium transition flex items-center justify-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                </svg>
+                Apply to All
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Batch Confirm Dialog -->
+        <div id="batchConfirmDialog" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden items-center justify-center">
+          <div class="bg-zinc-900 border border-zinc-700 rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-12 h-12 rounded-full bg-yellow-500/20 flex items-center justify-center">
+                <svg class="w-6 h-6 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                </svg>
+              </div>
+              <div>
+                <h3 class="text-lg font-semibold">Are you sure?</h3>
+                <p class="text-sm text-zinc-400">This action will overwrite all channel settings</p>
+              </div>
+            </div>
+            <p class="text-zinc-300 mb-6" id="batchConfirmMessage">
+              This will set all audit log event channels to the selected channel. Any previously configured channels will be replaced.
+            </p>
+            <div class="flex gap-3 justify-end">
+              <button onclick="hideBatchConfirmDialog()" class="px-4 py-2 bg-zinc-700 hover:bg-zinc-600 rounded-lg font-medium transition">
+                Cancel
+              </button>
+              <button onclick="applyBatchChannel()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg font-medium transition">
+                Yes, Apply to All
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Categories -->
+        <div class="space-y-4" id="categoriesContainer">
+          
+          <!-- User Events -->
+          <div class="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+            <div class="category-header p-4 flex items-center justify-between" onclick="toggleCategory('user')">
+              <h3 class="font-semibold flex items-center gap-2">
+                <span class="text-xl">👤</span> User Events
+              </h3>
+              <svg class="w-5 h-5 chevron" id="chevron-user" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+              </svg>
+            </div>
+            <div class="category-content" id="category-user">
+              <div class="p-4 pt-0 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <!-- User Join -->
+                <div class="event-card bg-zinc-800 p-4 rounded-lg border border-zinc-700">
+                  <h4 class="font-medium text-center mb-4">User Join</h4>
+                  <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                      <span class="text-sm">Enable Event</span>
+                      <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="user_join_enabled" class="sr-only peer">
+                        <div class="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                      </label>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Log Channel</label>
+                      <select id="user_join_channel" class="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm channel-select">
+                        <option value="">None</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Color</label>
+                      <div class="relative flex items-center gap-2">
+                        <input type="text" id="user_join_color" value="#00FF00" class="flex-1 bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm font-mono">
+                        <div class="relative">
+                          <input type="color" id="user_join_color_picker" value="#00FF00" class="color-input">
+                          <div id="user_join_color_preview" class="color-preview" style="background-color: #00FF00;"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- User Leave -->
+                <div class="event-card bg-zinc-800 p-4 rounded-lg border border-zinc-700">
+                  <h4 class="font-medium text-center mb-4">User Leave</h4>
+                  <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                      <span class="text-sm">Enable Event</span>
+                      <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="user_leave_enabled" class="sr-only peer">
+                        <div class="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                      </label>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Log Channel</label>
+                      <select id="user_leave_channel" class="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm channel-select">
+                        <option value="">None</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Color</label>
+                      <div class="relative flex items-center gap-2">
+                        <input type="text" id="user_leave_color" value="#FF0000" class="flex-1 bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm font-mono">
+                        <div class="relative">
+                          <input type="color" id="user_leave_color_picker" value="#FF0000" class="color-input">
+                          <div id="user_leave_color_preview" class="color-preview" style="background-color: #FF0000;"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- User Banned -->
+                <div class="event-card bg-zinc-800 p-4 rounded-lg border border-zinc-700">
+                  <h4 class="font-medium text-center mb-4">User Banned</h4>
+                  <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                      <span class="text-sm">Enable Event</span>
+                      <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="user_banned_enabled" class="sr-only peer">
+                        <div class="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                      </label>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Log Channel</label>
+                      <select id="user_banned_channel" class="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm channel-select">
+                        <option value="">None</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Color</label>
+                      <div class="relative flex items-center gap-2">
+                        <input type="text" id="user_banned_color" value="#FF0000" class="flex-1 bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm font-mono">
+                        <div class="relative">
+                          <input type="color" id="user_banned_color_picker" value="#FF0000" class="color-input">
+                          <div id="user_banned_color_preview" class="color-preview" style="background-color: #FF0000;"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- User Modified -->
+                <div class="event-card bg-zinc-800 p-4 rounded-lg border border-zinc-700">
+                  <h4 class="font-medium text-center mb-4">User Modified</h4>
+                  <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                      <span class="text-sm">Enable Event</span>
+                      <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="user_modified_enabled" class="sr-only peer">
+                        <div class="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                      </label>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Log Channel</label>
+                      <select id="user_modified_channel" class="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm channel-select">
+                        <option value="">None</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Color</label>
+                      <div class="relative flex items-center gap-2">
+                        <input type="text" id="user_modified_color" value="#D93A00" class="flex-1 bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm font-mono">
+                        <div class="relative">
+                          <input type="color" id="user_modified_color_picker" value="#D93A00" class="color-input">
+                          <div id="user_modified_color_preview" class="color-preview" style="background-color: #D93A00;"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Message Events -->
+          <div class="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+            <div class="category-header p-4 flex items-center justify-between" onclick="toggleCategory('message')">
+              <h3 class="font-semibold flex items-center gap-2">
+                <span class="text-xl">💬</span> Message Events
+              </h3>
+              <svg class="w-5 h-5 chevron" id="chevron-message" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+              </svg>
+            </div>
+            <div class="category-content" id="category-message">
+              <div class="p-4 pt-0 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- Message Deleted -->
+                <div class="event-card bg-zinc-800 p-4 rounded-lg border border-zinc-700">
+                  <h4 class="font-medium text-center mb-4">Message Deleted</h4>
+                  <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                      <span class="text-sm">Enable Event</span>
+                      <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="message_deleted_enabled" class="sr-only peer">
+                        <div class="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                      </label>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Log Channel</label>
+                      <select id="message_deleted_channel" class="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm channel-select">
+                        <option value="">None</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Color</label>
+                      <div class="relative flex items-center gap-2">
+                        <input type="text" id="message_deleted_color" value="#FF0000" class="flex-1 bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm font-mono">
+                        <div class="relative">
+                          <input type="color" id="message_deleted_color_picker" value="#FF0000" class="color-input">
+                          <div id="message_deleted_color_preview" class="color-preview" style="background-color: #FF0000;"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Message Modified -->
+                <div class="event-card bg-zinc-800 p-4 rounded-lg border border-zinc-700">
+                  <h4 class="font-medium text-center mb-4">Message Modified</h4>
+                  <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                      <span class="text-sm">Enable Event</span>
+                      <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="message_modified_enabled" class="sr-only peer">
+                        <div class="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                      </label>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Log Channel</label>
+                      <select id="message_modified_channel" class="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm channel-select">
+                        <option value="">None</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Color</label>
+                      <div class="relative flex items-center gap-2">
+                        <input type="text" id="message_modified_color" value="#D93A00" class="flex-1 bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm font-mono">
+                        <div class="relative">
+                          <input type="color" id="message_modified_color_picker" value="#D93A00" class="color-input">
+                          <div id="message_modified_color_preview" class="color-preview" style="background-color: #D93A00;"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Bulk Delete -->
+                <div class="event-card bg-zinc-800 p-4 rounded-lg border border-zinc-700">
+                  <h4 class="font-medium text-center mb-4">Bulk Delete Messages</h4>
+                  <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                      <span class="text-sm">Enable Event</span>
+                      <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="bulk_delete_enabled" class="sr-only peer">
+                        <div class="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                      </label>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Log Channel</label>
+                      <select id="bulk_delete_channel" class="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm channel-select">
+                        <option value="">None</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Color</label>
+                      <div class="relative flex items-center gap-2">
+                        <input type="text" id="bulk_delete_color" value="#FF0000" class="flex-1 bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm font-mono">
+                        <div class="relative">
+                          <input type="color" id="bulk_delete_color_picker" value="#FF0000" class="color-input">
+                          <div id="bulk_delete_color_preview" class="color-preview" style="background-color: #FF0000;"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Voice Events -->
+          <div class="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+            <div class="category-header p-4 flex items-center justify-between" onclick="toggleCategory('voice')">
+              <h3 class="font-semibold flex items-center gap-2">
+                <span class="text-xl">🎤</span> Voice Events
+              </h3>
+              <svg class="w-5 h-5 chevron" id="chevron-voice" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+              </svg>
+            </div>
+            <div class="category-content" id="category-voice">
+              <div class="p-4 pt-0 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- Voice Join -->
+                <div class="event-card bg-zinc-800 p-4 rounded-lg border border-zinc-700">
+                  <h4 class="font-medium text-center mb-4">Voice Join</h4>
+                  <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                      <span class="text-sm">Enable Event</span>
+                      <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="voice_join_enabled" class="sr-only peer">
+                        <div class="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                      </label>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Log Channel</label>
+                      <select id="voice_join_channel" class="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm channel-select">
+                        <option value="">None</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Color</label>
+                      <div class="relative flex items-center gap-2">
+                        <input type="text" id="voice_join_color" value="#00FF00" class="flex-1 bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm font-mono">
+                        <div class="relative">
+                          <input type="color" id="voice_join_color_picker" value="#00FF00" class="color-input">
+                          <div id="voice_join_color_preview" class="color-preview" style="background-color: #00FF00;"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Voice Swap -->
+                <div class="event-card bg-zinc-800 p-4 rounded-lg border border-zinc-700">
+                  <h4 class="font-medium text-center mb-4">Voice Swap</h4>
+                  <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                      <span class="text-sm">Enable Event</span>
+                      <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="voice_swap_enabled" class="sr-only peer">
+                        <div class="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                      </label>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Log Channel</label>
+                      <select id="voice_swap_channel" class="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm channel-select">
+                        <option value="">None</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Color</label>
+                      <div class="relative flex items-center gap-2">
+                        <input type="text" id="voice_swap_color" value="#00C7D9" class="flex-1 bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm font-mono">
+                        <div class="relative">
+                          <input type="color" id="voice_swap_color_picker" value="#00C7D9" class="color-input">
+                          <div id="voice_swap_color_preview" class="color-preview" style="background-color: #00C7D9;"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Voice Leave -->
+                <div class="event-card bg-zinc-800 p-4 rounded-lg border border-zinc-700">
+                  <h4 class="font-medium text-center mb-4">Voice Leave</h4>
+                  <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                      <span class="text-sm">Enable Event</span>
+                      <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="voice_leave_enabled" class="sr-only peer">
+                        <div class="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                      </label>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Log Channel</label>
+                      <select id="voice_leave_channel" class="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm channel-select">
+                        <option value="">None</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Color</label>
+                      <div class="relative flex items-center gap-2">
+                        <input type="text" id="voice_leave_color" value="#FF0000" class="flex-1 bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm font-mono">
+                        <div class="relative">
+                          <input type="color" id="voice_leave_color_picker" value="#FF0000" class="color-input">
+                          <div id="voice_leave_color_preview" class="color-preview" style="background-color: #FF0000;"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Server Events -->
+          <div class="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+            <div class="category-header p-4 flex items-center justify-between" onclick="toggleCategory('server')">
+              <h3 class="font-semibold flex items-center gap-2">
+                <span class="text-xl">🏠</span> Server Events
+              </h3>
+              <svg class="w-5 h-5 chevron" id="chevron-server" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+              </svg>
+            </div>
+            <div class="category-content" id="category-server">
+              <div class="p-4 pt-0">
+                <div class="event-card bg-zinc-800 p-4 rounded-lg border border-zinc-700 max-w-xs">
+                  <h4 class="font-medium text-center mb-4">Server Modified</h4>
+                  <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                      <span class="text-sm">Enable Event</span>
+                      <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="server_modified_enabled" class="sr-only peer">
+                        <div class="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                      </label>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Log Channel</label>
+                      <select id="server_modified_channel" class="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm channel-select">
+                        <option value="">None</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Color</label>
+                      <div class="relative flex items-center gap-2">
+                        <input type="text" id="server_modified_color" value="#D93A00" class="flex-1 bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm font-mono">
+                        <div class="relative">
+                          <input type="color" id="server_modified_color_picker" value="#D93A00" class="color-input">
+                          <div id="server_modified_color_preview" class="color-preview" style="background-color: #D93A00;"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Role Events -->
+          <div class="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+            <div class="category-header p-4 flex items-center justify-between" onclick="toggleCategory('role')">
+              <h3 class="font-semibold flex items-center gap-2">
+                <span class="text-xl">🎭</span> Role Events
+              </h3>
+              <svg class="w-5 h-5 chevron" id="chevron-role" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+              </svg>
+            </div>
+            <div class="category-content" id="category-role">
+              <div class="p-4 pt-0 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- Role Created -->
+                <div class="event-card bg-zinc-800 p-4 rounded-lg border border-zinc-700">
+                  <h4 class="font-medium text-center mb-4">Role Created</h4>
+                  <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                      <span class="text-sm">Enable Event</span>
+                      <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="role_created_enabled" class="sr-only peer">
+                        <div class="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                      </label>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Log Channel</label>
+                      <select id="role_created_channel" class="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm channel-select">
+                        <option value="">None</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Color</label>
+                      <div class="relative flex items-center gap-2">
+                        <input type="text" id="role_created_color" value="#00FF00" class="flex-1 bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm font-mono">
+                        <div class="relative">
+                          <input type="color" id="role_created_color_picker" value="#00FF00" class="color-input">
+                          <div id="role_created_color_preview" class="color-preview" style="background-color: #00FF00;"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Role Deleted -->
+                <div class="event-card bg-zinc-800 p-4 rounded-lg border border-zinc-700">
+                  <h4 class="font-medium text-center mb-4">Role Deleted</h4>
+                  <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                      <span class="text-sm">Enable Event</span>
+                      <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="role_deleted_enabled" class="sr-only peer">
+                        <div class="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                      </label>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Log Channel</label>
+                      <select id="role_deleted_channel" class="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm channel-select">
+                        <option value="">None</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Color</label>
+                      <div class="relative flex items-center gap-2">
+                        <input type="text" id="role_deleted_color" value="#FF0000" class="flex-1 bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm font-mono">
+                        <div class="relative">
+                          <input type="color" id="role_deleted_color_picker" value="#FF0000" class="color-input">
+                          <div id="role_deleted_color_preview" class="color-preview" style="background-color: #FF0000;"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Role Modified -->
+                <div class="event-card bg-zinc-800 p-4 rounded-lg border border-zinc-700">
+                  <h4 class="font-medium text-center mb-4">Role Modified</h4>
+                  <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                      <span class="text-sm">Enable Event</span>
+                      <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="role_modified_enabled" class="sr-only peer">
+                        <div class="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                      </label>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Log Channel</label>
+                      <select id="role_modified_channel" class="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm channel-select">
+                        <option value="">None</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Color</label>
+                      <div class="relative flex items-center gap-2">
+                        <input type="text" id="role_modified_color" value="#D93A00" class="flex-1 bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm font-mono">
+                        <div class="relative">
+                          <input type="color" id="role_modified_color_picker" value="#D93A00" class="color-input">
+                          <div id="role_modified_color_preview" class="color-preview" style="background-color: #D93A00;"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Channel Events -->
+          <div class="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+            <div class="category-header p-4 flex items-center justify-between" onclick="toggleCategory('channel')">
+              <h3 class="font-semibold flex items-center gap-2">
+                <span class="text-xl">📁</span> Channel Events
+              </h3>
+              <svg class="w-5 h-5 chevron" id="chevron-channel" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+              </svg>
+            </div>
+            <div class="category-content" id="category-channel">
+              <div class="p-4 pt-0 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- Channel Created -->
+                <div class="event-card bg-zinc-800 p-4 rounded-lg border border-zinc-700">
+                  <h4 class="font-medium text-center mb-4">Channel Created</h4>
+                  <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                      <span class="text-sm">Enable Event</span>
+                      <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="channel_created_enabled" class="sr-only peer">
+                        <div class="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                      </label>
+                    </div>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" id="channel_created_ignore_tickets" class="w-4 h-4 rounded bg-zinc-700 border-zinc-600 text-indigo-600 focus:ring-indigo-500">
+                      <span class="text-sm text-zinc-400">Ignore Support Tickets</span>
+                    </label>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Log Channel</label>
+                      <select id="channel_created_channel" class="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm channel-select">
+                        <option value="">None</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Color</label>
+                      <div class="relative flex items-center gap-2">
+                        <input type="text" id="channel_created_color" value="#00FF00" class="flex-1 bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm font-mono">
+                        <div class="relative">
+                          <input type="color" id="channel_created_color_picker" value="#00FF00" class="color-input">
+                          <div id="channel_created_color_preview" class="color-preview" style="background-color: #00FF00;"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Channel Deleted -->
+                <div class="event-card bg-zinc-800 p-4 rounded-lg border border-zinc-700">
+                  <h4 class="font-medium text-center mb-4">Channel Deleted</h4>
+                  <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                      <span class="text-sm">Enable Event</span>
+                      <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="channel_deleted_enabled" class="sr-only peer">
+                        <div class="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                      </label>
+                    </div>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" id="channel_deleted_ignore_tickets" class="w-4 h-4 rounded bg-zinc-700 border-zinc-600 text-indigo-600 focus:ring-indigo-500">
+                      <span class="text-sm text-zinc-400">Ignore Support Tickets</span>
+                    </label>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Log Channel</label>
+                      <select id="channel_deleted_channel" class="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm channel-select">
+                        <option value="">None</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Color</label>
+                      <div class="relative flex items-center gap-2">
+                        <input type="text" id="channel_deleted_color" value="#FF0000" class="flex-1 bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm font-mono">
+                        <div class="relative">
+                          <input type="color" id="channel_deleted_color_picker" value="#FF0000" class="color-input">
+                          <div id="channel_deleted_color_preview" class="color-preview" style="background-color: #FF0000;"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Channel Modified -->
+                <div class="event-card bg-zinc-800 p-4 rounded-lg border border-zinc-700">
+                  <h4 class="font-medium text-center mb-4">Channel Modified</h4>
+                  <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                      <span class="text-sm">Enable Event</span>
+                      <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="channel_modified_enabled" class="sr-only peer">
+                        <div class="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                      </label>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Log Channel</label>
+                      <select id="channel_modified_channel" class="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm channel-select">
+                        <option value="">None</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Color</label>
+                      <div class="relative flex items-center gap-2">
+                        <input type="text" id="channel_modified_color" value="#D93A00" class="flex-1 bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm font-mono">
+                        <div class="relative">
+                          <input type="color" id="channel_modified_color_picker" value="#D93A00" class="color-input">
+                          <div id="channel_modified_color_preview" class="color-preview" style="background-color: #D93A00;"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Invite Events -->
+          <div class="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+            <div class="category-header p-4 flex items-center justify-between" onclick="toggleCategory('invite')">
+              <h3 class="font-semibold flex items-center gap-2">
+                <span class="text-xl">🔗</span> Invite Events
+              </h3>
+              <svg class="w-5 h-5 chevron" id="chevron-invite" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+              </svg>
+            </div>
+            <div class="category-content" id="category-invite">
+              <div class="p-4 pt-0 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- Invite Created -->
+                <div class="event-card bg-zinc-800 p-4 rounded-lg border border-zinc-700">
+                  <h4 class="font-medium text-center mb-4">Invite Created</h4>
+                  <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                      <span class="text-sm">Enable Event</span>
+                      <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="invite_created_enabled" class="sr-only peer">
+                        <div class="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                      </label>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Log Channel</label>
+                      <select id="invite_created_channel" class="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm channel-select">
+                        <option value="">None</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Color</label>
+                      <div class="relative flex items-center gap-2">
+                        <input type="text" id="invite_created_color" value="#00FF00" class="flex-1 bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm font-mono">
+                        <div class="relative">
+                          <input type="color" id="invite_created_color_picker" value="#00FF00" class="color-input">
+                          <div id="invite_created_color_preview" class="color-preview" style="background-color: #00FF00;"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Invite Deleted -->
+                <div class="event-card bg-zinc-800 p-4 rounded-lg border border-zinc-700">
+                  <h4 class="font-medium text-center mb-4">Invite Deleted</h4>
+                  <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                      <span class="text-sm">Enable Event</span>
+                      <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="invite_deleted_enabled" class="sr-only peer">
+                        <div class="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                      </label>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Log Channel</label>
+                      <select id="invite_deleted_channel" class="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm channel-select">
+                        <option value="">None</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Color</label>
+                      <div class="relative flex items-center gap-2">
+                        <input type="text" id="invite_deleted_color" value="#FF0000" class="flex-1 bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm font-mono">
+                        <div class="relative">
+                          <input type="color" id="invite_deleted_color_picker" value="#FF0000" class="color-input">
+                          <div id="invite_deleted_color_preview" class="color-preview" style="background-color: #FF0000;"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Thread Events -->
+          <div class="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+            <div class="category-header p-4 flex items-center justify-between" onclick="toggleCategory('thread')">
+              <h3 class="font-semibold flex items-center gap-2">
+                <span class="text-xl">🧵</span> Thread Events
+              </h3>
+              <svg class="w-5 h-5 chevron" id="chevron-thread" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+              </svg>
+            </div>
+            <div class="category-content" id="category-thread">
+              <div class="p-4 pt-0 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- Thread Created -->
+                <div class="event-card bg-zinc-800 p-4 rounded-lg border border-zinc-700">
+                  <h4 class="font-medium text-center mb-4">Thread Created</h4>
+                  <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                      <span class="text-sm">Enable Event</span>
+                      <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="thread_created_enabled" class="sr-only peer">
+                        <div class="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                      </label>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Log Channel</label>
+                      <select id="thread_created_channel" class="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm channel-select">
+                        <option value="">None</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Color</label>
+                      <div class="relative flex items-center gap-2">
+                        <input type="text" id="thread_created_color" value="#00FF00" class="flex-1 bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm font-mono">
+                        <div class="relative">
+                          <input type="color" id="thread_created_color_picker" value="#00FF00" class="color-input">
+                          <div id="thread_created_color_preview" class="color-preview" style="background-color: #00FF00;"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Thread Deleted -->
+                <div class="event-card bg-zinc-800 p-4 rounded-lg border border-zinc-700">
+                  <h4 class="font-medium text-center mb-4">Thread Deleted</h4>
+                  <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                      <span class="text-sm">Enable Event</span>
+                      <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="thread_deleted_enabled" class="sr-only peer">
+                        <div class="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                      </label>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Log Channel</label>
+                      <select id="thread_deleted_channel" class="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm channel-select">
+                        <option value="">None</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Color</label>
+                      <div class="relative flex items-center gap-2">
+                        <input type="text" id="thread_deleted_color" value="#FF0000" class="flex-1 bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm font-mono">
+                        <div class="relative">
+                          <input type="color" id="thread_deleted_color_picker" value="#FF0000" class="color-input">
+                          <div id="thread_deleted_color_preview" class="color-preview" style="background-color: #FF0000;"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Thread Modified -->
+                <div class="event-card bg-zinc-800 p-4 rounded-lg border border-zinc-700">
+                  <h4 class="font-medium text-center mb-4">Thread Modified</h4>
+                  <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                      <span class="text-sm">Enable Event</span>
+                      <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="thread_modified_enabled" class="sr-only peer">
+                        <div class="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                      </label>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Log Channel</label>
+                      <select id="thread_modified_channel" class="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm channel-select">
+                        <option value="">None</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Color</label>
+                      <div class="relative flex items-center gap-2">
+                        <input type="text" id="thread_modified_color" value="#D93A00" class="flex-1 bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm font-mono">
+                        <div class="relative">
+                          <input type="color" id="thread_modified_color_picker" value="#D93A00" class="color-input">
+                          <div id="thread_modified_color_preview" class="color-preview" style="background-color: #D93A00;"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Stage Events -->
+          <div class="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+            <div class="category-header p-4 flex items-center justify-between" onclick="toggleCategory('stage')">
+              <h3 class="font-semibold flex items-center gap-2">
+                <span class="text-xl">🎭</span> Stage Events
+              </h3>
+              <svg class="w-5 h-5 chevron" id="chevron-stage" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+              </svg>
+            </div>
+            <div class="category-content" id="category-stage">
+              <div class="p-4 pt-0 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- Stage Started -->
+                <div class="event-card bg-zinc-800 p-4 rounded-lg border border-zinc-700">
+                  <h4 class="font-medium text-center mb-4">Stage Started</h4>
+                  <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                      <span class="text-sm">Enable Event</span>
+                      <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="stage_started_enabled" class="sr-only peer">
+                        <div class="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                      </label>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Log Channel</label>
+                      <select id="stage_started_channel" class="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm channel-select">
+                        <option value="">None</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Color</label>
+                      <div class="relative flex items-center gap-2">
+                        <input type="text" id="stage_started_color" value="#00FF00" class="flex-1 bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm font-mono">
+                        <div class="relative">
+                          <input type="color" id="stage_started_color_picker" value="#00FF00" class="color-input">
+                          <div id="stage_started_color_preview" class="color-preview" style="background-color: #00FF00;"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Stage Ended -->
+                <div class="event-card bg-zinc-800 p-4 rounded-lg border border-zinc-700">
+                  <h4 class="font-medium text-center mb-4">Stage Ended</h4>
+                  <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                      <span class="text-sm">Enable Event</span>
+                      <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="stage_ended_enabled" class="sr-only peer">
+                        <div class="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                      </label>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Log Channel</label>
+                      <select id="stage_ended_channel" class="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm channel-select">
+                        <option value="">None</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Color</label>
+                      <div class="relative flex items-center gap-2">
+                        <input type="text" id="stage_ended_color" value="#FF0000" class="flex-1 bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm font-mono">
+                        <div class="relative">
+                          <input type="color" id="stage_ended_color_picker" value="#FF0000" class="color-input">
+                          <div id="stage_ended_color_preview" class="color-preview" style="background-color: #FF0000;"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Stage Modified -->
+                <div class="event-card bg-zinc-800 p-4 rounded-lg border border-zinc-700">
+                  <h4 class="font-medium text-center mb-4">Stage Modified</h4>
+                  <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                      <span class="text-sm">Enable Event</span>
+                      <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="stage_modified_enabled" class="sr-only peer">
+                        <div class="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                      </label>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Log Channel</label>
+                      <select id="stage_modified_channel" class="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm channel-select">
+                        <option value="">None</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Color</label>
+                      <div class="relative flex items-center gap-2">
+                        <input type="text" id="stage_modified_color" value="#D93A00" class="flex-1 bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm font-mono">
+                        <div class="relative">
+                          <input type="color" id="stage_modified_color_picker" value="#D93A00" class="color-input">
+                          <div id="stage_modified_color_preview" class="color-preview" style="background-color: #D93A00;"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bot/Integration Events -->
+          <div class="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+            <div class="category-header p-4 flex items-center justify-between" onclick="toggleCategory('bot')">
+              <h3 class="font-semibold flex items-center gap-2">
+                <span class="text-xl">🤖</span> Bot/Integration Events
+              </h3>
+              <svg class="w-5 h-5 chevron" id="chevron-bot" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+              </svg>
+            </div>
+            <div class="category-content" id="category-bot">
+              <div class="p-4 pt-0">
+                <div class="event-card bg-zinc-800 p-4 rounded-lg border border-zinc-700 max-w-xs">
+                  <h4 class="font-medium text-center mb-4">Bot Added</h4>
+                  <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                      <span class="text-sm">Enable Event</span>
+                      <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="bot_added_enabled" class="sr-only peer">
+                        <div class="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                      </label>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Log Channel</label>
+                      <select id="bot_added_channel" class="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm channel-select">
+                        <option value="">None</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Color</label>
+                      <div class="relative flex items-center gap-2">
+                        <input type="text" id="bot_added_color" value="#00FF00" class="flex-1 bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm font-mono">
+                        <div class="relative">
+                          <input type="color" id="bot_added_color_picker" value="#00FF00" class="color-input">
+                          <div id="bot_added_color_preview" class="color-preview" style="background-color: #00FF00;"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Webhook Events -->
+          <div class="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+            <div class="category-header p-4 flex items-center justify-between" onclick="toggleCategory('webhook')">
+              <h3 class="font-semibold flex items-center gap-2">
+                <span class="text-xl">🔌</span> Webhook Events
+              </h3>
+              <svg class="w-5 h-5 chevron" id="chevron-webhook" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+              </svg>
+            </div>
+            <div class="category-content" id="category-webhook">
+              <div class="p-4 pt-0 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- Webhook Created -->
+                <div class="event-card bg-zinc-800 p-4 rounded-lg border border-zinc-700">
+                  <h4 class="font-medium text-center mb-4">Webhook Created</h4>
+                  <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                      <span class="text-sm">Enable Event</span>
+                      <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="webhook_created_enabled" class="sr-only peer">
+                        <div class="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                      </label>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Log Channel</label>
+                      <select id="webhook_created_channel" class="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm channel-select">
+                        <option value="">None</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Color</label>
+                      <div class="relative flex items-center gap-2">
+                        <input type="text" id="webhook_created_color" value="#00FF00" class="flex-1 bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm font-mono">
+                        <div class="relative">
+                          <input type="color" id="webhook_created_color_picker" value="#00FF00" class="color-input">
+                          <div id="webhook_created_color_preview" class="color-preview" style="background-color: #00FF00;"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Webhook Modified -->
+                <div class="event-card bg-zinc-800 p-4 rounded-lg border border-zinc-700">
+                  <h4 class="font-medium text-center mb-4">Webhook Modified</h4>
+                  <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                      <span class="text-sm">Enable Event</span>
+                      <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="webhook_modified_enabled" class="sr-only peer">
+                        <div class="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                      </label>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Log Channel</label>
+                      <select id="webhook_modified_channel" class="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm channel-select">
+                        <option value="">None</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Color</label>
+                      <div class="relative flex items-center gap-2">
+                        <input type="text" id="webhook_modified_color" value="#D93A00" class="flex-1 bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm font-mono">
+                        <div class="relative">
+                          <input type="color" id="webhook_modified_color_picker" value="#D93A00" class="color-input">
+                          <div id="webhook_modified_color_preview" class="color-preview" style="background-color: #D93A00;"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Webhook Deleted -->
+                <div class="event-card bg-zinc-800 p-4 rounded-lg border border-zinc-700">
+                  <h4 class="font-medium text-center mb-4">Webhook Deleted</h4>
+                  <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                      <span class="text-sm">Enable Event</span>
+                      <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="webhook_deleted_enabled" class="sr-only peer">
+                        <div class="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                      </label>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Log Channel</label>
+                      <select id="webhook_deleted_channel" class="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm channel-select">
+                        <option value="">None</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Color</label>
+                      <div class="relative flex items-center gap-2">
+                        <input type="text" id="webhook_deleted_color" value="#FF0000" class="flex-1 bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm font-mono">
+                        <div class="relative">
+                          <input type="color" id="webhook_deleted_color_picker" value="#FF0000" class="color-input">
+                          <div id="webhook_deleted_color_preview" class="color-preview" style="background-color: #FF0000;"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Monitored Roles -->
+          <div class="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+            <div class="category-header p-4 flex items-center justify-between" onclick="toggleCategory('monitored')">
+              <h3 class="font-semibold flex items-center gap-2">
+                <span class="text-xl">👁️</span> Monitored Roles
+              </h3>
+              <svg class="w-5 h-5 chevron" id="chevron-monitored" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+              </svg>
+            </div>
+            <div class="category-content" id="category-monitored">
+              <div class="p-4 pt-0">
+                <div class="event-card bg-zinc-800 p-4 rounded-lg border border-zinc-700 max-w-md">
+                  <h4 class="font-medium text-center mb-4">Monitored Roles Modified</h4>
+                  <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                      <span class="text-sm">Enable Event</span>
+                      <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="monitored_roles_enabled" class="sr-only peer">
+                        <div class="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                      </label>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Monitored Roles</label>
+                      <select id="monitored_roles" multiple data-placeholder="Select roles to monitor..." class="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm role-select min-h-[80px]">
+                      </select>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Log Channel</label>
+                      <select id="monitored_roles_channel" class="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm channel-select">
+                        <option value="">None</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-zinc-400 mb-1">Color</label>
+                      <div class="relative flex items-center gap-2">
+                        <input type="text" id="monitored_roles_color" value="#D93A00" class="flex-1 bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm font-mono">
+                        <div class="relative">
+                          <input type="color" id="monitored_roles_color_picker" value="#D93A00" class="color-input">
+                          <div id="monitored_roles_color_preview" class="color-preview" style="background-color: #D93A00;"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Save Button - Desktop -->
+        <div class="mt-6 hidden md:flex gap-4">
+          <button onclick="saveSettings()" class="bg-indigo-600 hover:bg-indigo-700 px-6 py-2.5 rounded-lg font-medium transition flex items-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
+            Save Changes
+          </button>
+          <button onclick="loadSettings()" class="bg-zinc-800 hover:bg-zinc-700 px-6 py-2.5 rounded-lg font-medium transition flex items-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            </svg>
+            Reset
+          </button>
+        </div>
+
+        <div id="saveStatus" class="mt-4 px-4 py-3 rounded-lg text-sm hidden"></div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Mobile Fixed Save Bar -->
+  <div class="fixed bottom-0 left-0 right-0 bg-zinc-900 border-t border-zinc-800 p-4 flex gap-3 md:hidden z-50">
+    <button onclick="saveSettings()" class="flex-1 bg-indigo-600 hover:bg-indigo-700 px-4 py-3 rounded-lg font-medium transition">
+      Save Changes
+    </button>
+    <button onclick="loadSettings()" class="bg-zinc-800 hover:bg-zinc-700 px-4 py-3 rounded-lg font-medium transition">
+      Reset
+    </button>
+  </div>
+  <div class="h-20 md:hidden"></div>
+
+  <script>
+    // Toggle category expansion
+    function toggleCategory(category) {
+      const content = document.getElementById(`category-${category}`);
+      const chevron = document.getElementById(`chevron-${category}`);
+      content.classList.toggle('open');
+      chevron.classList.toggle('open');
+    }
+
+    // Batch channel functions
+    function showBatchConfirmDialog() {
+      const batchChannel = document.getElementById('batch_channel').value;
+      if (!batchChannel) {
+        showToast('Please select a channel first', 'error');
+        return;
+      }
+      
+      const channelName = document.getElementById('batch_channel').selectedOptions[0]?.textContent || 'selected channel';
+      document.getElementById('batchConfirmMessage').innerHTML = 
+        `This will set <strong>all</strong> audit log event channels to <strong>${channelName}</strong>. Any previously configured channels will be replaced.`;
+      
+      document.getElementById('batchConfirmDialog').classList.remove('hidden');
+      document.getElementById('batchConfirmDialog').classList.add('flex');
+    }
+
+    function hideBatchConfirmDialog() {
+      document.getElementById('batchConfirmDialog').classList.add('hidden');
+      document.getElementById('batchConfirmDialog').classList.remove('flex');
+    }
+
+    function applyBatchChannel() {
+      const batchChannel = document.getElementById('batch_channel').value;
+      
+      // List of all channel select IDs (excluding the batch selector itself and ignored_channels)
+      const channelSelectIds = [
+        'user_join_channel', 'user_leave_channel', 'user_banned_channel', 'user_modified_channel',
+        'message_deleted_channel', 'message_modified_channel', 'bulk_delete_channel',
+        'voice_join_channel', 'voice_swap_channel', 'voice_leave_channel',
+        'server_modified_channel',
+        'role_created_channel', 'role_deleted_channel', 'role_modified_channel',
+        'channel_created_channel', 'channel_deleted_channel', 'channel_modified_channel',
+        'invite_created_channel', 'invite_deleted_channel',
+        'thread_created_channel', 'thread_deleted_channel', 'thread_modified_channel',
+        'stage_started_channel', 'stage_ended_channel', 'stage_modified_channel',
+        'bot_added_channel',
+        'webhook_created_channel', 'webhook_modified_channel', 'webhook_deleted_channel',
+        'monitored_roles_channel'
+      ];
+
+      // Set all channel selects to the batch value
+      channelSelectIds.forEach(id => {
+        const select = document.getElementById(id);
+        if (select) {
+          select.value = batchChannel;
+        }
+      });
+
+      hideBatchConfirmDialog();
+      showToast('All log channels have been updated! Don\'t forget to save.', 'success');
+    }
+
+    // Close dialog on outside click
+    document.getElementById('batchConfirmDialog')?.addEventListener('click', function(e) {
+      if (e.target === this) {
+        hideBatchConfirmDialog();
+      }
+    });
+
+    // Color picker sync
+    function setupColorPicker(baseId) {
+      const textInput = document.getElementById(baseId);
+      const colorPicker = document.getElementById(`${baseId}_picker`);
+      const preview = document.getElementById(`${baseId}_preview`);
+      
+      if (!textInput || !colorPicker || !preview) return;
+
+      textInput.addEventListener('input', () => {
+        const color = textInput.value;
+        if (/^#[0-9A-Fa-f]{6}$/.test(color)) {
+          colorPicker.value = color;
+          preview.style.backgroundColor = color;
+        }
+      });
+
+      colorPicker.addEventListener('input', () => {
+        textInput.value = colorPicker.value.toUpperCase();
+        preview.style.backgroundColor = colorPicker.value;
+      });
+    }
+
+    // Initialize all color pickers
+    const colorFields = [
+      'user_join_color', 'user_leave_color', 'user_banned_color', 'user_modified_color',
+      'message_deleted_color', 'message_modified_color', 'bulk_delete_color',
+      'voice_join_color', 'voice_swap_color', 'voice_leave_color',
+      'server_modified_color',
+      'role_created_color', 'role_deleted_color', 'role_modified_color',
+      'channel_created_color', 'channel_deleted_color', 'channel_modified_color',
+      'invite_created_color', 'invite_deleted_color',
+      'thread_created_color', 'thread_deleted_color', 'thread_modified_color',
+      'stage_started_color', 'stage_ended_color', 'stage_modified_color',
+      'bot_added_color',
+      'webhook_created_color', 'webhook_modified_color', 'webhook_deleted_color',
+      'monitored_roles_color'
+    ];
+
+    colorFields.forEach(setupColorPicker);
+
+    function onGuildReady(data) {
+      document.title = `${data.name} - Audit Log`;
+
+      // Populate channel selects
+      document.querySelectorAll('.channel-select').forEach(select => {
+        const isMultiple = select.multiple;
+        data.channels.forEach(channel => {
+          const option = document.createElement('option');
+          option.value = channel.id;
+          option.textContent = `#${channel.name}`;
+          select.appendChild(option);
+        });
+      });
+
+      // Populate role selects
+      document.querySelectorAll('.role-select').forEach(select => {
+        data.roles.forEach(role => {
+          const option = document.createElement('option');
+          option.value = role.id;
+          option.textContent = `@${role.name}`;
+          select.appendChild(option);
+        });
+      });
+
+      // Initialize multi-selects after options are populated
+      initMultiSelects();
+
+      loadSettings();
+    }
+
+    function loadSettings() {
+      fetch(`/api/guilds/${guildId}/auditlog`)
+        .then(res => res.json())
+        .then(settings => {
+          // Master toggle
+          setCheckbox('masterEnabled', settings.enabled);
+          
+          // Global settings
+          setMultiSelect('ignored_roles', settings.ignored_roles || []);
+          setMultiSelect('ignored_channels', settings.ignored_channels || []);
+
+          // User events
+          setCheckbox('user_join_enabled', settings.user_join_enabled);
+          setValue('user_join_channel', settings.user_join_channel);
+          setColor('user_join_color', settings.user_join_color);
+          
+          setCheckbox('user_leave_enabled', settings.user_leave_enabled);
+          setValue('user_leave_channel', settings.user_leave_channel);
+          setColor('user_leave_color', settings.user_leave_color);
+          
+          setCheckbox('user_banned_enabled', settings.user_banned_enabled);
+          setValue('user_banned_channel', settings.user_banned_channel);
+          setColor('user_banned_color', settings.user_banned_color);
+          
+          setCheckbox('user_modified_enabled', settings.user_modified_enabled);
+          setValue('user_modified_channel', settings.user_modified_channel);
+          setColor('user_modified_color', settings.user_modified_color);
+
+          // Message events
+          setCheckbox('message_deleted_enabled', settings.message_deleted_enabled);
+          setValue('message_deleted_channel', settings.message_deleted_channel);
+          setColor('message_deleted_color', settings.message_deleted_color);
+          
+          setCheckbox('message_modified_enabled', settings.message_modified_enabled);
+          setValue('message_modified_channel', settings.message_modified_channel);
+          setColor('message_modified_color', settings.message_modified_color);
+          
+          setCheckbox('bulk_delete_enabled', settings.bulk_delete_enabled);
+          setValue('bulk_delete_channel', settings.bulk_delete_channel);
+          setColor('bulk_delete_color', settings.bulk_delete_color);
+
+          // Voice events
+          setCheckbox('voice_join_enabled', settings.voice_join_enabled);
+          setValue('voice_join_channel', settings.voice_join_channel);
+          setColor('voice_join_color', settings.voice_join_color);
+          
+          setCheckbox('voice_swap_enabled', settings.voice_swap_enabled);
+          setValue('voice_swap_channel', settings.voice_swap_channel);
+          setColor('voice_swap_color', settings.voice_swap_color);
+          
+          setCheckbox('voice_leave_enabled', settings.voice_leave_enabled);
+          setValue('voice_leave_channel', settings.voice_leave_channel);
+          setColor('voice_leave_color', settings.voice_leave_color);
+
+          // Server events
+          setCheckbox('server_modified_enabled', settings.server_modified_enabled);
+          setValue('server_modified_channel', settings.server_modified_channel);
+          setColor('server_modified_color', settings.server_modified_color);
+
+          // Role events
+          setCheckbox('role_created_enabled', settings.role_created_enabled);
+          setValue('role_created_channel', settings.role_created_channel);
+          setColor('role_created_color', settings.role_created_color);
+          
+          setCheckbox('role_deleted_enabled', settings.role_deleted_enabled);
+          setValue('role_deleted_channel', settings.role_deleted_channel);
+          setColor('role_deleted_color', settings.role_deleted_color);
+          
+          setCheckbox('role_modified_enabled', settings.role_modified_enabled);
+          setValue('role_modified_channel', settings.role_modified_channel);
+          setColor('role_modified_color', settings.role_modified_color);
+
+          // Channel events
+          setCheckbox('channel_created_enabled', settings.channel_created_enabled);
+          setValue('channel_created_channel', settings.channel_created_channel);
+          setColor('channel_created_color', settings.channel_created_color);
+          setCheckbox('channel_created_ignore_tickets', settings.channel_created_ignore_tickets);
+          
+          setCheckbox('channel_deleted_enabled', settings.channel_deleted_enabled);
+          setValue('channel_deleted_channel', settings.channel_deleted_channel);
+          setColor('channel_deleted_color', settings.channel_deleted_color);
+          setCheckbox('channel_deleted_ignore_tickets', settings.channel_deleted_ignore_tickets);
+          
+          setCheckbox('channel_modified_enabled', settings.channel_modified_enabled);
+          setValue('channel_modified_channel', settings.channel_modified_channel);
+          setColor('channel_modified_color', settings.channel_modified_color);
+
+          // Invite events
+          setCheckbox('invite_created_enabled', settings.invite_created_enabled);
+          setValue('invite_created_channel', settings.invite_created_channel);
+          setColor('invite_created_color', settings.invite_created_color);
+          
+          setCheckbox('invite_deleted_enabled', settings.invite_deleted_enabled);
+          setValue('invite_deleted_channel', settings.invite_deleted_channel);
+          setColor('invite_deleted_color', settings.invite_deleted_color);
+
+          // Thread events
+          setCheckbox('thread_created_enabled', settings.thread_created_enabled);
+          setValue('thread_created_channel', settings.thread_created_channel);
+          setColor('thread_created_color', settings.thread_created_color);
+          
+          setCheckbox('thread_deleted_enabled', settings.thread_deleted_enabled);
+          setValue('thread_deleted_channel', settings.thread_deleted_channel);
+          setColor('thread_deleted_color', settings.thread_deleted_color);
+          
+          setCheckbox('thread_modified_enabled', settings.thread_modified_enabled);
+          setValue('thread_modified_channel', settings.thread_modified_channel);
+          setColor('thread_modified_color', settings.thread_modified_color);
+
+          // Stage events
+          setCheckbox('stage_started_enabled', settings.stage_started_enabled);
+          setValue('stage_started_channel', settings.stage_started_channel);
+          setColor('stage_started_color', settings.stage_started_color);
+          
+          setCheckbox('stage_ended_enabled', settings.stage_ended_enabled);
+          setValue('stage_ended_channel', settings.stage_ended_channel);
+          setColor('stage_ended_color', settings.stage_ended_color);
+          
+          setCheckbox('stage_modified_enabled', settings.stage_modified_enabled);
+          setValue('stage_modified_channel', settings.stage_modified_channel);
+          setColor('stage_modified_color', settings.stage_modified_color);
+
+          // Bot events
+          setCheckbox('bot_added_enabled', settings.bot_added_enabled);
+          setValue('bot_added_channel', settings.bot_added_channel);
+          setColor('bot_added_color', settings.bot_added_color);
+
+          // Webhook events
+          setCheckbox('webhook_created_enabled', settings.webhook_created_enabled);
+          setValue('webhook_created_channel', settings.webhook_created_channel);
+          setColor('webhook_created_color', settings.webhook_created_color);
+          
+          setCheckbox('webhook_modified_enabled', settings.webhook_modified_enabled);
+          setValue('webhook_modified_channel', settings.webhook_modified_channel);
+          setColor('webhook_modified_color', settings.webhook_modified_color);
+          
+          setCheckbox('webhook_deleted_enabled', settings.webhook_deleted_enabled);
+          setValue('webhook_deleted_channel', settings.webhook_deleted_channel);
+          setColor('webhook_deleted_color', settings.webhook_deleted_color);
+
+          // Monitored roles
+          setCheckbox('monitored_roles_enabled', settings.monitored_roles_enabled);
+          setMultiSelect('monitored_roles', settings.monitored_roles || []);
+          setValue('monitored_roles_channel', settings.monitored_roles_channel);
+          setColor('monitored_roles_color', settings.monitored_roles_color);
+        });
+    }
+
+    function setCheckbox(id, value) {
+      const el = document.getElementById(id);
+      if (el) el.checked = value === 1 || value === true;
+    }
+
+    function setValue(id, value) {
+      const el = document.getElementById(id);
+      if (el) el.value = value || '';
+    }
+
+    function setColor(id, value) {
+      const textInput = document.getElementById(id);
+      const picker = document.getElementById(`${id}_picker`);
+      const preview = document.getElementById(`${id}_preview`);
+      
+      if (value) {
+        if (textInput) textInput.value = value;
+        if (picker) picker.value = value;
+        if (preview) preview.style.backgroundColor = value;
+      }
+    }
+
+    function setMultiSelect(id, values) {
+      const select = document.getElementById(id);
+      if (!select) return;
+      
+      // Use the multi-select component if available
+      if (select.multiSelect) {
+        select.multiSelect.setValues(values || []);
+      } else {
+        // Fallback to native
+        Array.from(select.options).forEach(option => {
+          option.selected = values.includes(option.value);
+        });
+      }
+    }
+
+    function getMultiSelect(id) {
+      const select = document.getElementById(id);
+      if (!select) return [];
+      
+      // Use the multi-select component if available
+      if (select.multiSelect) {
+        return select.multiSelect.getValues();
+      }
+      return Array.from(select.selectedOptions).map(o => o.value);
+    }
+
+    async function saveSettings() {
+      const data = {
+        // Master toggle
+        enabled: document.getElementById('masterEnabled').checked ? 1 : 0,
+        
+        // Global
+        ignored_roles: getMultiSelect('ignored_roles'),
+        ignored_channels: getMultiSelect('ignored_channels'),
+        
+        // User events
+        user_join_enabled: document.getElementById('user_join_enabled').checked ? 1 : 0,
+        user_join_channel: document.getElementById('user_join_channel').value,
+        user_join_color: document.getElementById('user_join_color').value,
+        user_leave_enabled: document.getElementById('user_leave_enabled').checked ? 1 : 0,
+        user_leave_channel: document.getElementById('user_leave_channel').value,
+        user_leave_color: document.getElementById('user_leave_color').value,
+        user_banned_enabled: document.getElementById('user_banned_enabled').checked ? 1 : 0,
+        user_banned_channel: document.getElementById('user_banned_channel').value,
+        user_banned_color: document.getElementById('user_banned_color').value,
+        user_modified_enabled: document.getElementById('user_modified_enabled').checked ? 1 : 0,
+        user_modified_channel: document.getElementById('user_modified_channel').value,
+        user_modified_color: document.getElementById('user_modified_color').value,
+
+        // Message events
+        message_deleted_enabled: document.getElementById('message_deleted_enabled').checked ? 1 : 0,
+        message_deleted_channel: document.getElementById('message_deleted_channel').value,
+        message_deleted_color: document.getElementById('message_deleted_color').value,
+        message_modified_enabled: document.getElementById('message_modified_enabled').checked ? 1 : 0,
+        message_modified_channel: document.getElementById('message_modified_channel').value,
+        message_modified_color: document.getElementById('message_modified_color').value,
+        bulk_delete_enabled: document.getElementById('bulk_delete_enabled').checked ? 1 : 0,
+        bulk_delete_channel: document.getElementById('bulk_delete_channel').value,
+        bulk_delete_color: document.getElementById('bulk_delete_color').value,
+
+        // Voice events
+        voice_join_enabled: document.getElementById('voice_join_enabled').checked ? 1 : 0,
+        voice_join_channel: document.getElementById('voice_join_channel').value,
+        voice_join_color: document.getElementById('voice_join_color').value,
+        voice_swap_enabled: document.getElementById('voice_swap_enabled').checked ? 1 : 0,
+        voice_swap_channel: document.getElementById('voice_swap_channel').value,
+        voice_swap_color: document.getElementById('voice_swap_color').value,
+        voice_leave_enabled: document.getElementById('voice_leave_enabled').checked ? 1 : 0,
+        voice_leave_channel: document.getElementById('voice_leave_channel').value,
+        voice_leave_color: document.getElementById('voice_leave_color').value,
+
+        // Server events
+        server_modified_enabled: document.getElementById('server_modified_enabled').checked ? 1 : 0,
+        server_modified_channel: document.getElementById('server_modified_channel').value,
+        server_modified_color: document.getElementById('server_modified_color').value,
+
+        // Role events
+        role_created_enabled: document.getElementById('role_created_enabled').checked ? 1 : 0,
+        role_created_channel: document.getElementById('role_created_channel').value,
+        role_created_color: document.getElementById('role_created_color').value,
+        role_deleted_enabled: document.getElementById('role_deleted_enabled').checked ? 1 : 0,
+        role_deleted_channel: document.getElementById('role_deleted_channel').value,
+        role_deleted_color: document.getElementById('role_deleted_color').value,
+        role_modified_enabled: document.getElementById('role_modified_enabled').checked ? 1 : 0,
+        role_modified_channel: document.getElementById('role_modified_channel').value,
+        role_modified_color: document.getElementById('role_modified_color').value,
+
+        // Channel events
+        channel_created_enabled: document.getElementById('channel_created_enabled').checked ? 1 : 0,
+        channel_created_channel: document.getElementById('channel_created_channel').value,
+        channel_created_color: document.getElementById('channel_created_color').value,
+        channel_created_ignore_tickets: document.getElementById('channel_created_ignore_tickets').checked ? 1 : 0,
+        channel_deleted_enabled: document.getElementById('channel_deleted_enabled').checked ? 1 : 0,
+        channel_deleted_channel: document.getElementById('channel_deleted_channel').value,
+        channel_deleted_color: document.getElementById('channel_deleted_color').value,
+        channel_deleted_ignore_tickets: document.getElementById('channel_deleted_ignore_tickets').checked ? 1 : 0,
+        channel_modified_enabled: document.getElementById('channel_modified_enabled').checked ? 1 : 0,
+        channel_modified_channel: document.getElementById('channel_modified_channel').value,
+        channel_modified_color: document.getElementById('channel_modified_color').value,
+
+        // Invite events
+        invite_created_enabled: document.getElementById('invite_created_enabled').checked ? 1 : 0,
+        invite_created_channel: document.getElementById('invite_created_channel').value,
+        invite_created_color: document.getElementById('invite_created_color').value,
+        invite_deleted_enabled: document.getElementById('invite_deleted_enabled').checked ? 1 : 0,
+        invite_deleted_channel: document.getElementById('invite_deleted_channel').value,
+        invite_deleted_color: document.getElementById('invite_deleted_color').value,
+
+        // Thread events
+        thread_created_enabled: document.getElementById('thread_created_enabled').checked ? 1 : 0,
+        thread_created_channel: document.getElementById('thread_created_channel').value,
+        thread_created_color: document.getElementById('thread_created_color').value,
+        thread_deleted_enabled: document.getElementById('thread_deleted_enabled').checked ? 1 : 0,
+        thread_deleted_channel: document.getElementById('thread_deleted_channel').value,
+        thread_deleted_color: document.getElementById('thread_deleted_color').value,
+        thread_modified_enabled: document.getElementById('thread_modified_enabled').checked ? 1 : 0,
+        thread_modified_channel: document.getElementById('thread_modified_channel').value,
+        thread_modified_color: document.getElementById('thread_modified_color').value,
+
+        // Stage events
+        stage_started_enabled: document.getElementById('stage_started_enabled').checked ? 1 : 0,
+        stage_started_channel: document.getElementById('stage_started_channel').value,
+        stage_started_color: document.getElementById('stage_started_color').value,
+        stage_ended_enabled: document.getElementById('stage_ended_enabled').checked ? 1 : 0,
+        stage_ended_channel: document.getElementById('stage_ended_channel').value,
+        stage_ended_color: document.getElementById('stage_ended_color').value,
+        stage_modified_enabled: document.getElementById('stage_modified_enabled').checked ? 1 : 0,
+        stage_modified_channel: document.getElementById('stage_modified_channel').value,
+        stage_modified_color: document.getElementById('stage_modified_color').value,
+
+        // Bot events
+        bot_added_enabled: document.getElementById('bot_added_enabled').checked ? 1 : 0,
+        bot_added_channel: document.getElementById('bot_added_channel').value,
+        bot_added_color: document.getElementById('bot_added_color').value,
+
+        // Webhook events
+        webhook_created_enabled: document.getElementById('webhook_created_enabled').checked ? 1 : 0,
+        webhook_created_channel: document.getElementById('webhook_created_channel').value,
+        webhook_created_color: document.getElementById('webhook_created_color').value,
+        webhook_modified_enabled: document.getElementById('webhook_modified_enabled').checked ? 1 : 0,
+        webhook_modified_channel: document.getElementById('webhook_modified_channel').value,
+        webhook_modified_color: document.getElementById('webhook_modified_color').value,
+        webhook_deleted_enabled: document.getElementById('webhook_deleted_enabled').checked ? 1 : 0,
+        webhook_deleted_channel: document.getElementById('webhook_deleted_channel').value,
+        webhook_deleted_color: document.getElementById('webhook_deleted_color').value,
+
+        // Monitored roles
+        monitored_roles_enabled: document.getElementById('monitored_roles_enabled').checked ? 1 : 0,
+        monitored_roles: getMultiSelect('monitored_roles'),
+        monitored_roles_channel: document.getElementById('monitored_roles_channel').value,
+        monitored_roles_color: document.getElementById('monitored_roles_color').value
+      };
+
+      const status = document.getElementById('saveStatus');
+      status.textContent = 'Saving...';
+      status.className = 'mt-4 px-4 py-3 rounded-lg text-sm bg-zinc-800 text-zinc-400';
+
+      try {
+        const res = await fetch(`/api/guilds/${guildId}/auditlog`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+
+        if (res.ok) {
+          status.textContent = '✓ Settings saved successfully!';
+          status.className = 'mt-4 px-4 py-3 rounded-lg text-sm bg-green-500/20 text-green-400';
+        } else {
+          throw new Error('Failed to save');
+        }
+      } catch (err) {
+        status.textContent = '✗ Failed to save settings. Please try again.';
+        status.className = 'mt-4 px-4 py-3 rounded-lg text-sm bg-red-500/20 text-red-400';
+      }
+
+      setTimeout(() => { status.className = 'mt-4 px-4 py-3 rounded-lg text-sm hidden'; }, 3000);
+    }
+  </script>
+  <%- include('partials/scripts/guild-loader') %>
+  <%- include('partials/scripts/multi-select') %>
+</body>
+</html>

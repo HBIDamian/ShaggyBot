@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title: title }) %>
+</head>
+<body class="bg-zinc-950 text-white min-h-screen guild-page">
+  <%- include('partials/background') %>
+  <%- include('partials/navbar', { requiresAuth: true, activePage: 'dashboard' }) %>
+
+  <div class="flex min-h-[calc(100vh-65px)] relative z-10">
+    <%- include('partials/sidebar', { activeSection: 'starboard' }) %>
+
+    <!-- Main Content -->
+    <main class="flex-1 p-4 md:p-8 overflow-y-auto lg:ml-72">
+      <div class="max-w-3xl mx-auto">
+        <div class="mb-6 md:mb-8">
+          <h1 class="text-xl md:text-2xl font-bold mb-2">⭐ Starboard</h1>
+          <p class="text-zinc-400 text-sm md:text-base">Showcase popular messages that receive enough star reactions in a dedicated channel.</p>
+        </div>
+
+        <form id="starboardForm" class="space-y-6">
+          <!-- Master Toggle -->
+          <div class="bg-indigo-600/20 border border-indigo-500 p-6 rounded-xl">
+            <div class="flex justify-between items-center">
+              <div>
+                <h3 class="font-semibold text-lg">Enable Starboard</h3>
+                <p class="text-sm text-zinc-400">Master switch for the starboard feature</p>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="enabled" class="sr-only peer">
+                <div class="w-14 h-7 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-indigo-600"></div>
+              </label>
+            </div>
+          </div>
+
+          <!-- Basic Settings -->
+          <div class="bg-zinc-900 p-6 rounded-xl border border-zinc-800 space-y-4">
+            <div>
+              <h3 class="font-semibold text-lg mb-1">📋 Basic Settings</h3>
+              <p class="text-sm text-zinc-400">Configure the core starboard settings</p>
+            </div>
+
+            <div>
+              <label for="channel_id" class="block text-sm font-medium mb-2">Starboard Channel</label>
+              <select id="channel_id" name="channel_id"
+                      class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 focus:outline-none focus:border-indigo-500 transition channel-select">
+                <option value="">Select a channel...</option>
+              </select>
+              <p class="text-xs text-zinc-500 mt-1.5">Channel where starred messages will be posted</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label for="emoji" class="block text-sm font-medium mb-2">Star Emoji</label>
+                <input type="text" id="emoji" value="⭐" maxlength="50"
+                       class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500">
+                <p class="text-xs text-zinc-500 mt-1">Default: ⭐ (can use custom emoji ID)</p>
+              </div>
+              <div>
+                <label for="threshold" class="block text-sm font-medium mb-2">Minimum Stars Required</label>
+                <input type="number" id="threshold" min="1" max="50" value="3"
+                       class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500">
+                <p class="text-xs text-zinc-500 mt-1">How many reactions needed to be posted</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Advanced Options -->
+          <div class="bg-zinc-900 p-6 rounded-xl border border-zinc-800 space-y-4">
+            <div>
+              <h3 class="font-semibold text-lg mb-1">⚙️ Advanced Options</h3>
+              <p class="text-sm text-zinc-400">Fine-tune the starboard behavior</p>
+            </div>
+
+            <div class="space-y-3">
+              <div class="flex items-center justify-between gap-4 p-3 bg-zinc-800/50 rounded-lg">
+                <div>
+                  <span class="text-sm font-medium">Allow Self-Starring</span>
+                  <p class="text-xs text-zinc-500">Let users star their own messages</p>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" id="self_star" class="sr-only peer">
+                  <div class="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                </label>
+              </div>
+
+              <div class="flex items-center justify-between gap-4 p-3 bg-zinc-800/50 rounded-lg">
+                <div>
+                  <span class="text-sm font-medium">Ignore NSFW Channels</span>
+                  <p class="text-xs text-zinc-500">Don't star messages from NSFW channels</p>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" id="ignore_nsfw" checked class="sr-only peer">
+                  <div class="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- Ignored Channels -->
+          <div class="bg-zinc-900 p-6 rounded-xl border border-zinc-800 space-y-4">
+            <div>
+              <h3 class="font-semibold text-lg mb-1">🚫 Ignored Channels</h3>
+              <p class="text-sm text-zinc-400">Messages from these channels won't be added to the starboard</p>
+            </div>
+
+            <div>
+              <select id="ignored_channels" multiple data-placeholder="Select channels to ignore..."
+                      class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 focus:outline-none focus:border-indigo-500 transition min-h-[100px] channel-select">
+              </select>
+            </div>
+          </div>
+
+          <!-- Preview -->
+          <div class="bg-zinc-900 p-6 rounded-xl border border-zinc-800">
+            <h3 class="font-semibold text-lg mb-4">👁️ Starboard Preview</h3>
+            <div class="bg-[#36393f] rounded-lg p-4">
+              <div class="flex items-start gap-4">
+                <div class="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center text-lg">
+                  ⭐
+                </div>
+                <div class="flex-1">
+                  <div class="flex items-center gap-2 mb-1">
+                    <span class="font-semibold text-[#f8f9fa]">Starboard</span>
+                    <span class="text-xs text-[#72767d]">Today at 12:00 PM</span>
+                  </div>
+                  <div class="text-[#dcddde] text-sm mb-2">
+                    <span id="previewEmoji">⭐</span> <span id="previewCount" class="font-semibold">3</span> | <span class="text-[#00aff4]">#general</span>
+                  </div>
+                  <div class="bg-[#2f3136] rounded p-3 border-l-4 border-indigo-500">
+                    <div class="flex items-center gap-2 mb-2">
+                      <div class="w-6 h-6 rounded-full bg-green-500"></div>
+                      <span class="text-sm font-medium text-[#f8f9fa]">SomeUser</span>
+                    </div>
+                    <p class="text-sm text-[#dcddde]">This is an example starred message! 🎉</p>
+                  </div>
+                  <a href="#" class="text-xs text-[#00aff4] hover:underline mt-2 inline-block">Jump to Message</a>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Actions - Desktop -->
+          <div class="hidden md:flex gap-4">
+            <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 px-6 py-2.5 rounded-lg font-medium transition">
+              Save Changes
+            </button>
+            <button type="button" onclick="loadSettings()" class="bg-zinc-800 hover:bg-zinc-700 px-6 py-2.5 rounded-lg font-medium transition">
+              Reset
+            </button>
+          </div>
+        </form>
+
+        <div id="saveStatus" class="mt-4 px-4 py-3 rounded-lg text-sm hidden"></div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Mobile Fixed Save Bar -->
+  <div class="fixed bottom-0 left-0 right-0 bg-zinc-900 border-t border-zinc-800 p-4 flex gap-3 md:hidden z-50">
+    <button type="button" onclick="document.getElementById('starboardForm').dispatchEvent(new Event('submit', {cancelable: true, bubbles: true}))" class="flex-1 bg-indigo-600 hover:bg-indigo-700 px-4 py-3 rounded-lg font-medium transition">
+      Save Changes
+    </button>
+    <button type="button" onclick="loadSettings()" class="bg-zinc-800 hover:bg-zinc-700 px-4 py-3 rounded-lg font-medium transition">
+      Reset
+    </button>
+  </div>
+  <div class="h-20 md:hidden"></div>
+
+  <script>
+    let allChannels = [];
+
+    function onGuildReady(data) {
+      document.title = `Starboard - ${data.name} - ShaggyBot`;
+      allChannels = data.channels;
+
+      // Populate channel selects
+      document.querySelectorAll('.channel-select').forEach(select => {
+        data.channels.forEach(channel => {
+          const option = document.createElement('option');
+          option.value = channel.id;
+          option.textContent = `#${channel.name}`;
+          select.appendChild(option);
+        });
+      });
+
+      // Initialize multi-selects after options are populated
+      initMultiSelects();
+
+      loadSettings();
+    }
+
+    function loadSettings() {
+      fetch(`/api/guilds/${guildId}/starboard`).then(res => res.json()).then(settings => {
+        document.getElementById('enabled').checked = settings.enabled;
+        document.getElementById('channel_id').value = settings.channel_id || '';
+        document.getElementById('emoji').value = settings.emoji || '⭐';
+        document.getElementById('threshold').value = settings.threshold || 3;
+        document.getElementById('self_star').checked = settings.self_star;
+        document.getElementById('ignore_nsfw').checked = settings.ignore_nsfw;
+        
+        setMultiSelect('ignored_channels', settings.ignored_channels || []);
+        updatePreview();
+      }).catch(() => {
+        // Default values on error
+      });
+    }
+
+    function setMultiSelect(id, values) {
+      const select = document.getElementById(id);
+      if (!select) return;
+      
+      if (select.multiSelect) {
+        select.multiSelect.setValues(values || []);
+      } else {
+        Array.from(select.options).forEach(option => {
+          option.selected = values.includes(option.value);
+        });
+      }
+    }
+
+    function getMultiSelect(id) {
+      const select = document.getElementById(id);
+      if (!select) return [];
+      
+      if (select.multiSelect) {
+        return select.multiSelect.getValues();
+      }
+      return Array.from(select.selectedOptions).map(o => o.value);
+    }
+
+    function updatePreview() {
+      const emoji = document.getElementById('emoji').value || '⭐';
+      const threshold = document.getElementById('threshold').value || 3;
+      document.getElementById('previewEmoji').textContent = emoji;
+      document.getElementById('previewCount').textContent = threshold;
+    }
+
+    document.getElementById('emoji').addEventListener('input', updatePreview);
+    document.getElementById('threshold').addEventListener('input', updatePreview);
+
+    document.getElementById('starboardForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const data = {
+        enabled: document.getElementById('enabled').checked ? 1 : 0,
+        channel_id: document.getElementById('channel_id').value,
+        emoji: document.getElementById('emoji').value || '⭐',
+        threshold: parseInt(document.getElementById('threshold').value) || 3,
+        self_star: document.getElementById('self_star').checked ? 1 : 0,
+        ignore_nsfw: document.getElementById('ignore_nsfw').checked ? 1 : 0,
+        ignored_channels: getMultiSelect('ignored_channels')
+      };
+
+      const status = document.getElementById('saveStatus');
+      status.textContent = 'Saving...';
+      status.className = 'mt-4 px-4 py-3 rounded-lg text-sm bg-zinc-800 text-zinc-400';
+
+      try {
+        const res = await fetch(`/api/guilds/${guildId}/starboard`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        if (res.ok) {
+          status.textContent = '✓ Starboard settings saved successfully!';
+          status.className = 'mt-4 px-4 py-3 rounded-lg text-sm bg-green-500/20 text-green-400';
+        } else throw new Error('Failed');
+      } catch {
+        status.textContent = '✗ Failed to save settings. Please try again.';
+        status.className = 'mt-4 px-4 py-3 rounded-lg text-sm bg-red-500/20 text-red-400';
+      }
+      setTimeout(() => { status.className = 'mt-4 px-4 py-3 rounded-lg text-sm hidden'; }, 3000);
+    });
+  </script>
+  <%- include('partials/scripts/guild-loader') %>
+  <%- include('partials/scripts/multi-select') %>
+</body>
+</html>

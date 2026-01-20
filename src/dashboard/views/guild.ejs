@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title: title }) %>
+</head>
+<body class="bg-zinc-950 text-white min-h-screen guild-page">
+  <%- include('partials/background') %>
+  <%- include('partials/navbar', { requiresAuth: true, activePage: 'dashboard' }) %>
+
+  <div class="flex min-h-[calc(100vh-65px)] relative z-10">
+    <%- include('partials/sidebar', { activeSection: 'settings' }) %>
+
+    <!-- Main Content -->
+    <main class="flex-1 p-4 md:p-8 overflow-y-auto lg:ml-72">
+      <div class="max-w-4xl mx-auto">
+        <div class="mb-6 md:mb-8">
+          <h1 class="text-xl md:text-2xl font-bold mb-2">Bot Settings</h1>
+          <p class="text-zinc-400 text-sm md:text-base">Configure basic bot settings for your server.</p>
+        </div>
+
+        <!-- Info Banner -->
+        <div class="bg-indigo-500/10 border border-indigo-500/30 rounded-xl p-4 mb-6 flex items-center gap-3">
+          <svg class="w-5 h-5 text-indigo-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+          </svg>
+          <p class="text-sm text-indigo-200">Note: Some settings may take some time to apply to your server due to caching.</p>
+        </div>
+
+        <form id="settingsForm" class="space-y-6">
+          <!-- General Settings - Two Column Grid -->
+          <div class="bg-zinc-900 p-6 rounded-xl border border-zinc-800">
+            <h3 class="font-semibold mb-6 flex items-center gap-2">
+              <svg class="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+              </svg>
+              General Settings
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label for="prefix" class="block text-sm font-medium mb-2">Command Prefix</label>
+                <input type="text" id="prefix" name="prefix" maxlength="5" placeholder="!"
+                       class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 focus:outline-none focus:border-indigo-500 transition">
+                <p class="text-xs text-zinc-500 mt-1.5">Legacy command prefix</p>
+              </div>
+              
+              <div>
+                <label for="server_timezone" class="block text-sm font-medium mb-2">Server Timezone</label>
+                <select id="server_timezone" name="server_timezone" data-searchable data-placeholder="Select timezone..." data-search-placeholder="Search timezones..."
+                        class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 focus:outline-none focus:border-indigo-500 transition">
+                </select>
+                <p class="text-xs text-zinc-500 mt-1.5">Timezone for timestamps</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Suggestion System -->
+          <div class="bg-zinc-900 p-6 rounded-xl border border-zinc-800">
+            <h3 class="font-semibold mb-6 flex items-center gap-2">
+              <svg class="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+              </svg>
+              Suggestion System
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label for="suggestion_channel" class="block text-sm font-medium mb-2">Suggestion Channel</label>
+                <select id="suggestion_channel" name="suggestion_channel"
+                        class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 focus:outline-none focus:border-indigo-500 transition channel-select">
+                  <option value="">None</option>
+                </select>
+                <p class="text-xs text-zinc-500 mt-1.5">Where suggestions are posted</p>
+              </div>
+              
+              <div>
+                <label for="suggestion_approved_channel" class="block text-sm font-medium mb-2">Suggestion Approved Channel</label>
+                <select id="suggestion_approved_channel" name="suggestion_approved_channel"
+                        class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 focus:outline-none focus:border-indigo-500 transition channel-select">
+                  <option value="">None</option>
+                </select>
+                <p class="text-xs text-zinc-500 mt-1.5">Where approved suggestions go</p>
+              </div>
+              
+              <div>
+                <label for="suggestion_denied_channel" class="block text-sm font-medium mb-2">Suggestion Denied Channel</label>
+                <select id="suggestion_denied_channel" name="suggestion_denied_channel"
+                        class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 focus:outline-none focus:border-indigo-500 transition channel-select">
+                  <option value="">None</option>
+                </select>
+                <p class="text-xs text-zinc-500 mt-1.5">Where denied suggestions go</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Logging -->
+          <div class="bg-zinc-900 p-6 rounded-xl border border-zinc-800">
+            <h3 class="font-semibold mb-6 flex items-center gap-2">
+              <svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+              </svg>
+              Logging
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label for="mod_log_channel" class="block text-sm font-medium mb-2">Mod Log Channel</label>
+                <select id="mod_log_channel" name="mod_log_channel"
+                        class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 focus:outline-none focus:border-indigo-500 transition channel-select">
+                  <option value="">None</option>
+                </select>
+                <p class="text-xs text-zinc-500 mt-1.5">Channel for moderation logs</p>
+              </div>
+              
+              <div>
+                <label for="notes_staff_role" class="block text-sm font-medium mb-2">Notes Staff Role</label>
+                <select id="notes_staff_role" name="notes_staff_role"
+                        class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 focus:outline-none focus:border-indigo-500 transition role-select">
+                  <option value="">None</option>
+                </select>
+                <p class="text-xs text-zinc-500 mt-1.5">Role that can view/add staff notes</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Welcome Messages -->
+          <div class="bg-zinc-900 p-6 rounded-xl border border-zinc-800 space-y-4">
+            <h3 class="font-semibold flex items-center gap-2">
+              <svg class="w-5 h-5 text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/>
+              </svg>
+              Welcome Messages
+            </h3>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+              <div>
+                <label for="welcome_channel" class="block text-sm font-medium mb-2">Welcome Channel</label>
+                <select id="welcome_channel" name="welcome_channel"
+                        class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 focus:outline-none focus:border-indigo-500 transition channel-select">
+                  <option value="">Disabled</option>
+                </select>
+              </div>
+              
+              <div>
+                <label for="auto_role" class="block text-sm font-medium mb-2">Auto-Assign Role</label>
+                <select id="auto_role" name="auto_role"
+                        class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 focus:outline-none focus:border-indigo-500 transition role-select">
+                  <option value="">Disabled</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label for="welcome_message" class="block text-sm font-medium mb-2">Welcome Message</label>
+              <textarea id="welcome_message" name="welcome_message" rows="3" placeholder="Welcome {user} to {server}!"
+                        class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 focus:outline-none focus:border-indigo-500 transition resize-y"></textarea>
+              <p class="text-xs text-zinc-500 mt-1.5">Use {user} for mention, {username} for name, {server} for server name</p>
+            </div>
+
+            <div>
+              <label for="leave_message" class="block text-sm font-medium mb-2">Leave Message</label>
+              <textarea id="leave_message" name="leave_message" rows="3" placeholder="{username} has left the server."
+                        class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 focus:outline-none focus:border-indigo-500 transition resize-y"></textarea>
+              <p class="text-xs text-zinc-500 mt-1.5">Message sent when a member leaves</p>
+            </div>
+          </div>
+
+          <!-- Message Features -->
+          <div class="bg-zinc-900 p-6 rounded-xl border border-zinc-800">
+            <h3 class="font-semibold mb-6 flex items-center gap-2">
+              <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+              </svg>
+              Message Features
+            </h3>
+            
+            <div class="space-y-6">
+              <!-- Auto Quoter -->
+              <div class="flex items-start gap-4 p-4 bg-zinc-800/50 rounded-lg">
+                <label class="relative inline-flex items-center cursor-pointer mt-1">
+                  <input type="checkbox" id="auto_quoter_enabled" name="auto_quoter_enabled" class="sr-only peer">
+                  <div class="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                </label>
+                <div class="flex-1">
+                  <h4 class="font-medium text-white">Auto Quoter</h4>
+                  <p class="text-sm text-zinc-400 mt-1">Automatically quote Discord message links. When someone posts a message link, the bot will show a preview of that message.</p>
+                </div>
+              </div>
+
+              <!-- Git Code Previewer -->
+              <div class="flex items-start gap-4 p-4 bg-zinc-800/50 rounded-lg">
+                <label class="relative inline-flex items-center cursor-pointer mt-1">
+                  <input type="checkbox" id="git_previewer_enabled" name="git_previewer_enabled" class="sr-only peer">
+                  <div class="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                </label>
+                <div class="flex-1">
+                  <h4 class="font-medium text-white">Git Code Previewer</h4>
+                  <p class="text-sm text-zinc-400 mt-1">Preview code from GitHub links with line numbers. Automatically shows code snippets when someone shares a GitHub file link.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Actions - Desktop -->
+          <div class="hidden md:flex gap-4">
+            <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 px-6 py-2.5 rounded-lg font-medium transition flex items-center gap-2">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+              </svg>
+              Save Changes
+            </button>
+            <button type="button" onclick="loadSettings()" class="bg-zinc-800 hover:bg-zinc-700 px-6 py-2.5 rounded-lg font-medium transition flex items-center gap-2">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+              </svg>
+              Reset
+            </button>
+          </div>
+        </form>
+
+        <div id="saveStatus" class="mt-4 px-4 py-3 rounded-lg text-sm hidden"></div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Mobile Fixed Save Bar -->
+  <div class="fixed bottom-0 left-0 right-0 bg-zinc-900 border-t border-zinc-800 p-4 flex gap-3 md:hidden z-50">
+    <button type="button" onclick="document.getElementById('settingsForm').dispatchEvent(new Event('submit', {cancelable: true, bubbles: true}))" class="flex-1 bg-indigo-600 hover:bg-indigo-700 px-4 py-3 rounded-lg font-medium transition">
+      Save Changes
+    </button>
+    <button type="button" onclick="loadSettings()" class="bg-zinc-800 hover:bg-zinc-700 px-4 py-3 rounded-lg font-medium transition">
+      Reset
+    </button>
+  </div>
+  <div class="h-20 md:hidden"></div>
+
+  <script>
+    // Get all IANA timezones from the built-in Intl API
+    function getAllTimezones() {
+      try {
+        // Modern browsers/Node.js support this
+        return Intl.supportedValuesOf('timeZone');
+      } catch {
+        // Fallback for older environments
+        return ['UTC'];
+      }
+    }
+
+    function getTimezoneOffset(tz) {
+      try {
+        const now = new Date();
+        const formatter = new Intl.DateTimeFormat('en-US', {
+          timeZone: tz,
+          timeZoneName: 'shortOffset'
+        });
+        const parts = formatter.formatToParts(now);
+        const offsetPart = parts.find(p => p.type === 'timeZoneName');
+        return offsetPart ? offsetPart.value : '';
+      } catch {
+        return '';
+      }
+    }
+
+    function onGuildReady(data) {
+      document.title = `${data.name} - ShaggyBot Dashboard`;
+
+      // Populate timezone select with all IANA timezones
+      const tzSelect = document.getElementById('server_timezone');
+      const timezones = getAllTimezones();
+      
+      timezones.forEach(tz => {
+        const option = document.createElement('option');
+        option.value = tz;
+        const offset = getTimezoneOffset(tz);
+        option.textContent = `${tz} (${offset})`;
+        tzSelect.appendChild(option);
+      });
+
+      // Initialize searchable selects
+      initSearchableSelects();
+
+      // Populate all channel selects
+      document.querySelectorAll('.channel-select').forEach(select => {
+        data.channels.forEach(channel => {
+          const option = document.createElement('option');
+          option.value = channel.id;
+          option.textContent = `#${channel.name}`;
+          select.appendChild(option);
+        });
+      });
+
+      // Populate all role selects
+      document.querySelectorAll('.role-select').forEach(select => {
+        data.roles.forEach(role => {
+          const option = document.createElement('option');
+          option.value = role.id;
+          option.textContent = `@${role.name}`;
+          select.appendChild(option);
+        });
+      });
+
+      loadSettings();
+    }
+
+    function loadSettings() {
+      fetch(`/api/guilds/${guildId}/settings`)
+        .then(res => res.json())
+        .then(settings => {
+          document.getElementById('prefix').value = settings.prefix || '!';
+          
+          // Set timezone using the searchable select component
+          const tzSelect = document.getElementById('server_timezone');
+          if (tzSelect.searchableSelect) {
+            tzSelect.searchableSelect.setValue(settings.server_timezone || 'UTC');
+          } else {
+            tzSelect.value = settings.server_timezone || 'UTC';
+          }
+          
+          document.getElementById('mod_log_channel').value = settings.mod_log_channel || '';
+          document.getElementById('notes_staff_role').value = settings.notes_staff_role || '';
+          document.getElementById('welcome_channel').value = settings.welcome_channel || '';
+          document.getElementById('welcome_message').value = settings.welcome_message || '';
+          document.getElementById('leave_message').value = settings.leave_message || '';
+          document.getElementById('auto_role').value = settings.auto_role || '';
+          document.getElementById('suggestion_channel').value = settings.suggestion_channel || '';
+          document.getElementById('suggestion_approved_channel').value = settings.suggestion_approved_channel || '';
+          document.getElementById('suggestion_denied_channel').value = settings.suggestion_denied_channel || '';
+          document.getElementById('auto_quoter_enabled').checked = settings.auto_quoter_enabled === 1;
+          document.getElementById('git_previewer_enabled').checked = settings.git_previewer_enabled === 1;
+        });
+    }
+
+    document.getElementById('settingsForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const formData = new FormData(e.target);
+      const data = Object.fromEntries(formData.entries());
+      
+      // Handle checkboxes
+      data.auto_quoter_enabled = document.getElementById('auto_quoter_enabled').checked ? 1 : 0;
+      data.git_previewer_enabled = document.getElementById('git_previewer_enabled').checked ? 1 : 0;
+
+      const status = document.getElementById('saveStatus');
+      status.textContent = 'Saving...';
+      status.className = 'mt-4 px-4 py-3 rounded-lg text-sm bg-zinc-800 text-zinc-400';
+
+      try {
+        const res = await fetch(`/api/guilds/${guildId}/settings`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+
+        if (res.ok) {
+          status.textContent = '✓ Settings saved successfully!';
+          status.className = 'mt-4 px-4 py-3 rounded-lg text-sm bg-green-500/20 text-green-400';
+        } else {
+          throw new Error('Failed to save');
+        }
+      } catch (err) {
+        status.textContent = '✗ Failed to save settings. Please try again.';
+        status.className = 'mt-4 px-4 py-3 rounded-lg text-sm bg-red-500/20 text-red-400';
+      }
+
+      setTimeout(() => { status.className = 'mt-4 px-4 py-3 rounded-lg text-sm hidden'; }, 3000);
+    });
+  </script>
+  <%- include('partials/scripts/searchable-select') %>
+  <%- include('partials/scripts/guild-loader') %>
+</body>
+</html>

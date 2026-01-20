@@ -1,0 +1,66 @@
+<script>
+// Instant page transitions with prefetching
+(function() {
+  const prefetchedUrls = new Set();
+  
+  // Prefetch pages on hover (they load from cache on click)
+  document.addEventListener('mouseover', (e) => {
+    const link = e.target.closest('a[href]');
+    if (!link) return;
+    
+    const url = link.href;
+    if (!url.startsWith(window.location.origin)) return;
+    if (prefetchedUrls.has(url)) return;
+    if (link.target === '_blank') return;
+    
+    // Prefetch the page
+    const prefetch = document.createElement('link');
+    prefetch.rel = 'prefetch';
+    prefetch.href = url;
+    document.head.appendChild(prefetch);
+    prefetchedUrls.add(url);
+  });
+
+  // Show loading state immediately on click
+  document.addEventListener('click', (e) => {
+    const link = e.target.closest('a[href]');
+    if (!link) return;
+    if (!link.href.startsWith(window.location.origin)) return;
+    if (link.target === '_blank' || e.ctrlKey || e.metaKey) return;
+    
+    // Add loading class for instant visual feedback
+    document.body.classList.add('page-loading');
+  });
+})();
+</script>
+
+<style>
+/* Instant loading feedback */
+.page-loading {
+  cursor: wait;
+}
+
+.page-loading main {
+  opacity: 0.7;
+  transition: opacity 0.1s;
+}
+
+/* Optional: Add loading bar at top */
+.page-loading::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 50%, #6366f1 100%);
+  background-size: 200% 100%;
+  animation: loading-bar 1s linear infinite;
+  z-index: 9999;
+}
+
+@keyframes loading-bar {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+</style>

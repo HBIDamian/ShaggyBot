@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title: title }) %>
+</head>
+<body class="bg-zinc-950 text-white min-h-screen guild-page">
+  <%- include('partials/background') %>
+  <%- include('partials/navbar', { requiresAuth: true, activePage: 'dashboard' }) %>
+
+  <div class="flex min-h-[calc(100vh-65px)] relative z-10">
+    <%- include('partials/sidebar', { activeSection: 'trolldiscourager' }) %>
+
+    <!-- Main Content -->
+    <main class="flex-1 p-4 md:p-8 overflow-y-auto lg:ml-72">
+      <div class="max-w-4xl mx-auto">
+        <div class="mb-6 md:mb-8">
+          <h1 class="text-xl md:text-2xl font-bold mb-2">🤡 Troll Discourager</h1>
+          <p class="text-zinc-400 text-sm md:text-base">Automatically troll specific users with random actions on their messages.</p>
+        </div>
+
+        <form id="trollForm" class="space-y-6">
+          <!-- Master Toggle -->
+          <div class="bg-indigo-600/20 border border-indigo-500 p-6 rounded-xl">
+            <div class="flex justify-between items-center">
+              <div>
+                <h3 class="font-semibold text-lg">Enable Troll Discourager</h3>
+                <p class="text-sm text-zinc-400">Master switch for all troll actions</p>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="enabled" class="sr-only peer">
+                <div class="w-14 h-7 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-indigo-600"></div>
+              </label>
+            </div>
+          </div>
+
+          <!-- Target Users -->
+          <div class="bg-zinc-900 p-6 rounded-xl border border-zinc-800 space-y-4">
+            <div>
+              <h3 class="font-semibold text-lg mb-1">🎯 Target Users</h3>
+              <p class="text-sm text-zinc-400">Users whose messages will be randomly trolled</p>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium mb-2">Target User IDs</label>
+              <div id="targetUsersContainer" class="space-y-2 mb-3">
+                <!-- User entries will be added here -->
+              </div>
+              <div class="flex gap-2">
+                <input type="text" id="newUserId" placeholder="Enter User ID..." 
+                       class="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-indigo-500">
+                <button type="button" onclick="addTargetUser()" class="bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg text-sm font-medium transition">
+                  Add User
+                </button>
+              </div>
+              <p class="text-xs text-zinc-500 mt-2">Right-click a user → Copy User ID to get their ID</p>
+            </div>
+          </div>
+
+          <!-- Delete Action -->
+          <div class="bg-zinc-900 p-6 rounded-xl border border-zinc-800 space-y-4">
+            <div class="flex justify-between items-center">
+              <div>
+                <h3 class="font-semibold text-lg mb-1">🗑️ Delete Messages</h3>
+                <p class="text-sm text-zinc-400">Randomly delete their messages</p>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="delete_enabled" class="sr-only peer">
+                <div class="w-11 h-6 bg-zinc-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600 relative"></div>
+              </label>
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-2">Chance (%)</label>
+              <input type="number" id="delete_chance" min="1" max="100" value="20"
+                     class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500">
+              <p class="text-xs text-zinc-500 mt-1">Percentage chance to delete when this action is selected</p>
+            </div>
+          </div>
+
+          <!-- Mock Action -->
+          <div class="bg-zinc-900 p-6 rounded-xl border border-zinc-800 space-y-4">
+            <div class="flex justify-between items-center">
+              <div>
+                <h3 class="font-semibold text-lg mb-1">🤪 Mock Messages</h3>
+                <p class="text-sm text-zinc-400">rAnDoMlY cHaNgE tHeIr MeSsAgE cAsE</p>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="mock_enabled" class="sr-only peer">
+                <div class="w-11 h-6 bg-zinc-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600 relative"></div>
+              </label>
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-2">Chance (%)</label>
+              <input type="number" id="mock_chance" min="1" max="100" value="20"
+                     class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500">
+              <p class="text-xs text-zinc-500 mt-1">Percentage chance to mock when this action is selected</p>
+            </div>
+          </div>
+
+          <!-- Clown Reaction -->
+          <div class="bg-zinc-900 p-6 rounded-xl border border-zinc-800 space-y-4">
+            <div class="flex justify-between items-center">
+              <div>
+                <h3 class="font-semibold text-lg mb-1">🤡 Clown Reaction</h3>
+                <p class="text-sm text-zinc-400">React with 🤡 to their messages</p>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="clown_enabled" class="sr-only peer">
+                <div class="w-11 h-6 bg-zinc-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600 relative"></div>
+              </label>
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-2">Chance (%)</label>
+              <input type="number" id="clown_chance" min="1" max="100" value="80"
+                     class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500">
+              <p class="text-xs text-zinc-500 mt-1">Percentage chance to react when this action is selected</p>
+            </div>
+          </div>
+
+          <!-- Reverse Text -->
+          <div class="bg-zinc-900 p-6 rounded-xl border border-zinc-800 space-y-4">
+            <div class="flex justify-between items-center">
+              <div>
+                <h3 class="font-semibold text-lg mb-1">🔄 Reverse Text</h3>
+                <p class="text-sm text-zinc-400">txet rieht esreveR</p>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="reverse_enabled" class="sr-only peer">
+                <div class="w-11 h-6 bg-zinc-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600 relative"></div>
+              </label>
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-2">Chance (%)</label>
+              <input type="number" id="reverse_chance" min="1" max="100" value="30"
+                     class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500">
+              <p class="text-xs text-zinc-500 mt-1">Percentage chance to reverse when this action is selected</p>
+            </div>
+          </div>
+
+          <!-- UwU-ify -->
+          <div class="bg-zinc-900 p-6 rounded-xl border border-zinc-800 space-y-4">
+            <div class="flex justify-between items-center">
+              <div>
+                <h3 class="font-semibold text-lg mb-1">✨ UwU-ify</h3>
+                <p class="text-sm text-zinc-400">Tuwn theiw text into uwu speak owo</p>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="uwu_enabled" class="sr-only peer">
+                <div class="w-11 h-6 bg-zinc-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600 relative"></div>
+              </label>
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-2">Chance (%)</label>
+              <input type="number" id="uwu_chance" min="1" max="100" value="40"
+                     class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500">
+              <p class="text-xs text-zinc-500 mt-1">Percentage chance to uwu-ify when this action is selected</p>
+            </div>
+          </div>
+
+          <!-- Emoji Spam -->
+          <div class="bg-zinc-900 p-6 rounded-xl border border-zinc-800 space-y-4">
+            <div class="flex justify-between items-center">
+              <div>
+                <h3 class="font-semibold text-lg mb-1">😂 Emoji Spam</h3>
+                <p class="text-sm text-zinc-400">React with 3-5 random troll emojis</p>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="emoji_spam_enabled" class="sr-only peer">
+                <div class="w-11 h-6 bg-zinc-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600 relative"></div>
+              </label>
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-2">Chance (%)</label>
+              <input type="number" id="emoji_spam_chance" min="1" max="100" value="50"
+                     class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500">
+              <p class="text-xs text-zinc-500 mt-1">Percentage chance to emoji spam when this action is selected</p>
+            </div>
+          </div>
+
+          <!-- Spoiler Reply -->
+          <div class="bg-zinc-900 p-6 rounded-xl border border-zinc-800 space-y-4">
+            <div class="flex justify-between items-center">
+              <div>
+                <h3 class="font-semibold text-lg mb-1">⬛ Spoiler Reply</h3>
+                <p class="text-sm text-zinc-400">Reply with their message wrapped in ||spoilers||</p>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="spoiler_enabled" class="sr-only peer">
+                <div class="w-11 h-6 bg-zinc-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600 relative"></div>
+              </label>
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-2">Chance (%)</label>
+              <input type="number" id="spoiler_chance" min="1" max="100" value="30"
+                     class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500">
+              <p class="text-xs text-zinc-500 mt-1">Percentage chance to spoiler reply when this action is selected</p>
+            </div>
+          </div>
+
+          <!-- Save Button -->
+          <div class="flex justify-end">
+            <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 px-6 py-3 rounded-lg font-semibold transition">
+              Save Changes
+            </button>
+          </div>
+        </form>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    let targetUsers = [];
+
+    function onGuildReady(data) {
+      document.title = `Troll Discourager - ${data.name} - ShaggyBot`;
+      loadSettings();
+    }
+
+    function loadSettings() {
+      fetch(`/api/guilds/${guildId}/trolldiscourager`)
+        .then(res => res.json())
+        .then(settings => {
+          document.getElementById('enabled').checked = settings.enabled;
+          document.getElementById('delete_enabled').checked = settings.delete_enabled;
+          document.getElementById('delete_chance').value = settings.delete_chance;
+          document.getElementById('mock_enabled').checked = settings.mock_enabled;
+          document.getElementById('mock_chance').value = settings.mock_chance;
+          document.getElementById('clown_enabled').checked = settings.clown_enabled;
+          document.getElementById('clown_chance').value = settings.clown_chance;
+          document.getElementById('reverse_enabled').checked = settings.reverse_enabled;
+          document.getElementById('reverse_chance').value = settings.reverse_chance || 30;
+          document.getElementById('uwu_enabled').checked = settings.uwu_enabled;
+          document.getElementById('uwu_chance').value = settings.uwu_chance || 40;
+          document.getElementById('emoji_spam_enabled').checked = settings.emoji_spam_enabled;
+          document.getElementById('emoji_spam_chance').value = settings.emoji_spam_chance || 50;
+          document.getElementById('spoiler_enabled').checked = settings.spoiler_enabled;
+          document.getElementById('spoiler_chance').value = settings.spoiler_chance || 30;
+          
+          targetUsers = settings.target_users || [];
+          renderTargetUsers();
+        })
+        .catch(err => {
+          console.error('Failed to load settings:', err);
+          showToast('Failed to load settings', 'error');
+        });
+    }
+
+    function renderTargetUsers() {
+      const container = document.getElementById('targetUsersContainer');
+      
+      if (targetUsers.length === 0) {
+        container.innerHTML = '<p class="text-zinc-500 text-sm">No target users added yet.</p>';
+        return;
+      }
+      
+      container.innerHTML = targetUsers.map((userId, index) => `
+        <div class="flex items-center gap-2 bg-zinc-800 rounded-lg px-3 py-2">
+          <code class="flex-1 text-sm">${userId}</code>
+          <button type="button" onclick="removeTargetUser(${index})" class="text-red-400 hover:text-red-300 transition">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+      `).join('');
+    }
+
+    function addTargetUser() {
+      const input = document.getElementById('newUserId');
+      const userId = input.value.trim();
+      
+      if (!userId) {
+        showToast('Please enter a user ID', 'error');
+        return;
+      }
+      
+      if (!/^\d{17,19}$/.test(userId)) {
+        showToast('Invalid user ID format', 'error');
+        return;
+      }
+      
+      if (targetUsers.includes(userId)) {
+        showToast('User already added', 'error');
+        return;
+      }
+      
+      targetUsers.push(userId);
+      renderTargetUsers();
+      input.value = '';
+    }
+
+    function removeTargetUser(index) {
+      targetUsers.splice(index, 1);
+      renderTargetUsers();
+    }
+
+    document.getElementById('trollForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const settings = {
+        enabled: document.getElementById('enabled').checked ? 1 : 0,
+        target_users: targetUsers,
+        delete_enabled: document.getElementById('delete_enabled').checked ? 1 : 0,
+        delete_chance: parseInt(document.getElementById('delete_chance').value) || 20,
+        mock_enabled: document.getElementById('mock_enabled').checked ? 1 : 0,
+        mock_chance: parseInt(document.getElementById('mock_chance').value) || 20,
+        clown_enabled: document.getElementById('clown_enabled').checked ? 1 : 0,
+        clown_chance: parseInt(document.getElementById('clown_chance').value) || 80,
+        reverse_enabled: document.getElementById('reverse_enabled').checked ? 1 : 0,
+        reverse_chance: parseInt(document.getElementById('reverse_chance').value) || 30,
+        uwu_enabled: document.getElementById('uwu_enabled').checked ? 1 : 0,
+        uwu_chance: parseInt(document.getElementById('uwu_chance').value) || 40,
+        emoji_spam_enabled: document.getElementById('emoji_spam_enabled').checked ? 1 : 0,
+        emoji_spam_chance: parseInt(document.getElementById('emoji_spam_chance').value) || 50,
+        spoiler_enabled: document.getElementById('spoiler_enabled').checked ? 1 : 0,
+        spoiler_chance: parseInt(document.getElementById('spoiler_chance').value) || 30
+      };
+
+      try {
+        const res = await fetch(`/api/guilds/${guildId}/trolldiscourager`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(settings)
+        });
+
+        if (res.ok) {
+          showToast('Settings saved successfully!', 'success');
+        } else {
+          showToast('Failed to save settings', 'error');
+        }
+      } catch (err) {
+        console.error('Error saving settings:', err);
+        showToast('Failed to save settings', 'error');
+      }
+    });
+
+    // Allow adding user with Enter key
+    document.getElementById('newUserId').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        addTargetUser();
+      }
+    });
+  </script>
+  <%- include('partials/scripts/guild-loader') %>
+</body>
+</html>

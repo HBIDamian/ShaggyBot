@@ -1,0 +1,1010 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title: title }) %>
+</head>
+<body class="bg-zinc-950 text-white min-h-screen guild-page">
+  <%- include('partials/background') %>
+  <%- include('partials/navbar', { requiresAuth: true, activePage: 'dashboard' }) %>
+
+  <div class="flex min-h-[calc(100vh-65px)] relative z-10">
+    <%- include('partials/sidebar', { activeSection: 'automod' }) %>
+
+    <!-- Main Content -->
+    <main class="flex-1 p-4 md:p-8 overflow-y-auto lg:ml-72">
+      <div class="max-w-4xl mx-auto">
+        <div class="mb-6 md:mb-8">
+          <h1 class="text-xl md:text-2xl font-bold mb-2">Auto-Moderation</h1>
+          <p class="text-zinc-400 text-sm md:text-base">Configure automatic moderation rules for your server.</p>
+        </div>
+
+        <form id="automodForm" class="space-y-6">
+          <!-- Master Toggle -->
+          <div class="bg-indigo-600/20 border border-indigo-500 p-6 rounded-xl">
+            <div class="flex justify-between items-center">
+              <div>
+                <h3 class="font-semibold text-lg">Enable Auto-Moderation</h3>
+                <p class="text-sm text-zinc-400">Master switch for all auto-moderation features</p>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="enabled" class="sr-only peer">
+                <div class="w-14 h-7 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-indigo-600"></div>
+              </label>
+            </div>
+          </div>
+
+          <!-- General Settings -->
+          <div class="bg-zinc-900 p-6 rounded-xl border border-zinc-800 space-y-4">
+            <div>
+              <h3 class="font-semibold text-lg mb-1">⚙️ General Settings</h3>
+              <p class="text-sm text-zinc-400">Configure log channel and exemptions</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium mb-2">Log Channel</label>
+                <select id="log_channel" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500">
+                  <option value="">None (No Logging)</option>
+                </select>
+                <p class="text-xs text-zinc-500 mt-1">Channel to log automod actions</p>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-zinc-800">
+              <label class="flex items-center gap-3 cursor-pointer">
+                <input type="checkbox" id="exclude_admins" class="sr-only peer">
+                <div class="w-11 h-6 bg-zinc-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600 relative"></div>
+                <span class="text-sm">Exclude Admins</span>
+              </label>
+              <label class="flex items-center gap-3 cursor-pointer">
+                <input type="checkbox" id="exclude_mods" class="sr-only peer">
+                <div class="w-11 h-6 bg-zinc-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600 relative"></div>
+                <span class="text-sm">Exclude Mods</span>
+              </label>
+              <label class="flex items-center gap-3 cursor-pointer">
+                <input type="checkbox" id="exclude_bots" class="sr-only peer">
+                <div class="w-11 h-6 bg-zinc-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600 relative"></div>
+                <span class="text-sm">Exclude Bots</span>
+              </label>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium mb-2">Ignored Roles</label>
+              <select id="exempt_roles" multiple data-placeholder="Select roles to ignore...">
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium mb-2">Ignored Channels</label>
+              <select id="exempt_channels" multiple data-placeholder="Select channels to ignore...">
+              </select>
+            </div>
+          </div>
+
+          <!-- Moderation Features Grid -->
+          <h3 class="text-lg font-semibold mt-8 mb-4">Message Moderation</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+            <!-- Word Blacklist -->
+            <div class="bg-zinc-900 p-5 rounded-xl border border-zinc-800">
+              <div class="flex justify-between items-start mb-3">
+                <div class="flex items-center gap-2">
+                  <span class="text-lg">🤬</span>
+                  <h4 class="font-medium">Word Blacklist</h4>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" id="bad_words_enabled" class="sr-only peer feature-toggle" data-settings="badWordsSettings">
+                  <div class="w-11 h-6 bg-zinc-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                </label>
+              </div>
+              <p class="text-xs text-zinc-500 mb-3">Block messages containing prohibited words</p>
+              <div id="badWordsSettings" class="space-y-3 hidden">
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" id="bad_words_use_default" class="rounded bg-zinc-700 border-zinc-600 text-indigo-600 focus:ring-indigo-500">
+                  <span class="text-sm">Use default word list</span>
+                </label>
+                <div>
+                  <label class="block text-xs font-medium mb-1 text-zinc-400">Custom Words</label>
+                  <textarea id="bad_words_list" rows="2" placeholder="word1, word2, word3"
+                            class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 resize-none"></textarea>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium mb-1 text-zinc-400">Punishment</label>
+                  <select id="bad_words_action" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-indigo-500">
+                    <option value="delete">Delete Message</option>
+                    <option value="delete_warn">Delete & Warn User</option>
+                    <option value="delete_timeout">Delete & Timeout User (1h)</option>
+                    <option value="warn">Warn User</option>
+                    <option value="delete_kick">Delete Message & Kick User</option>
+                    <option value="delete_kick_warn">Delete & Kick + Warn User</option>
+                    <option value="ban">Ban User (Delete 24h)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Mass Capitalization -->
+            <div class="bg-zinc-900 p-5 rounded-xl border border-zinc-800">
+              <div class="flex justify-between items-start mb-3">
+                <div class="flex items-center gap-2">
+                  <span class="text-lg">🔠</span>
+                  <h4 class="font-medium">Mass Capitalization</h4>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" id="caps_enabled" class="sr-only peer feature-toggle" data-settings="capsSettings">
+                  <div class="w-11 h-6 bg-zinc-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                </label>
+              </div>
+              <p class="text-xs text-zinc-500 mb-3">Prevent excessive capital letters</p>
+              <div id="capsSettings" class="space-y-3 hidden">
+                <div class="grid grid-cols-2 gap-2">
+                  <div>
+                    <label class="block text-xs font-medium mb-1 text-zinc-400">Min Characters</label>
+                    <input type="number" id="caps_min_chars" min="4" max="50" value="8"
+                           class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-indigo-500">
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium mb-1 text-zinc-400">Threshold %</label>
+                    <input type="number" id="caps_percentage" min="50" max="100" value="70"
+                           class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-indigo-500">
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium mb-1 text-zinc-400">Punishment</label>
+                  <select id="caps_action" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-indigo-500">
+                    <option value="delete">Delete Message</option>
+                    <option value="delete_warn">Delete & Warn User</option>
+                    <option value="delete_timeout">Delete & Timeout User (1h)</option>
+                    <option value="warn">Warn User</option>
+                    <option value="delete_kick">Delete Message & Kick User</option>
+                    <option value="delete_kick_warn">Delete & Kick + Warn User</option>
+                    <option value="ban">Ban User (Delete 24h)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Duplicate Characters -->
+            <div class="bg-zinc-900 p-5 rounded-xl border border-zinc-800">
+              <div class="flex justify-between items-start mb-3">
+                <div class="flex items-center gap-2">
+                  <span class="text-lg">🔁</span>
+                  <h4 class="font-medium">Duplicate Characters</h4>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" id="duplicate_chars_enabled" class="sr-only peer feature-toggle" data-settings="duplicateCharsSettings">
+                  <div class="w-11 h-6 bg-zinc-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                </label>
+              </div>
+              <p class="text-xs text-zinc-500 mb-3">Block repeated characters (e.g., "hellooooooo")</p>
+              <div id="duplicateCharsSettings" class="space-y-3 hidden">
+                <div class="grid grid-cols-2 gap-2">
+                  <div>
+                    <label class="block text-xs font-medium mb-1 text-zinc-400">Min Repeats</label>
+                    <input type="number" id="duplicate_chars_min" min="3" max="20" value="4"
+                           class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-indigo-500">
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium mb-1 text-zinc-400">Threshold %</label>
+                    <input type="number" id="duplicate_chars_percentage" min="30" max="100" value="75"
+                           class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-indigo-500">
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium mb-1 text-zinc-400">Punishment</label>
+                  <select id="duplicate_chars_action" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-indigo-500">
+                    <option value="delete">Delete Message</option>
+                    <option value="delete_warn">Delete & Warn User</option>
+                    <option value="delete_timeout">Delete & Timeout User (1h)</option>
+                    <option value="warn">Warn User</option>
+                    <option value="delete_kick">Delete Message & Kick User</option>
+                    <option value="delete_kick_warn">Delete & Kick + Warn User</option>
+                    <option value="ban">Ban User (Delete 24h)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Duplicate Words -->
+            <div class="bg-zinc-900 p-5 rounded-xl border border-zinc-800">
+              <div class="flex justify-between items-start mb-3">
+                <div class="flex items-center gap-2">
+                  <span class="text-lg">📝</span>
+                  <h4 class="font-medium">Duplicate Words</h4>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" id="duplicate_words_enabled" class="sr-only peer feature-toggle" data-settings="duplicateWordsSettings">
+                  <div class="w-11 h-6 bg-zinc-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                </label>
+              </div>
+              <p class="text-xs text-zinc-500 mb-3">Block repeated words (e.g., "hey hey hey hey")</p>
+              <div id="duplicateWordsSettings" class="space-y-3 hidden">
+                <div>
+                  <label class="block text-xs font-medium mb-1 text-zinc-400">Min Repeated Words</label>
+                  <input type="number" id="duplicate_words_count" min="3" max="20" value="5"
+                         class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                  <label class="block text-xs font-medium mb-1 text-zinc-400">Punishment</label>
+                  <select id="duplicate_words_action" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-indigo-500">
+                    <option value="delete">Delete Message</option>
+                    <option value="delete_warn">Delete & Warn User</option>
+                    <option value="delete_timeout">Delete & Timeout User (1h)</option>
+                    <option value="warn">Warn User</option>
+                    <option value="delete_kick">Delete Message & Kick User</option>
+                    <option value="delete_kick_warn">Delete & Kick + Warn User</option>
+                    <option value="ban">Ban User (Delete 24h)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Mass Mentions -->
+            <div class="bg-zinc-900 p-5 rounded-xl border border-zinc-800">
+              <div class="flex justify-between items-start mb-3">
+                <div class="flex items-center gap-2">
+                  <span class="text-lg">📢</span>
+                  <h4 class="font-medium">Mass Mentions</h4>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" id="mass_mentions_enabled" class="sr-only peer feature-toggle" data-settings="massMentionsSettings">
+                  <div class="w-11 h-6 bg-zinc-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                </label>
+              </div>
+              <p class="text-xs text-zinc-500 mb-3">Prevent mass mentioning users</p>
+              <div id="massMentionsSettings" class="space-y-3 hidden">
+                <div>
+                  <label class="block text-xs font-medium mb-1 text-zinc-400">Max Mentions</label>
+                  <input type="number" id="mass_mentions_count" min="2" max="20" value="5"
+                         class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                  <label class="block text-xs font-medium mb-1 text-zinc-400">Punishment</label>
+                  <select id="mass_mentions_action" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-indigo-500">
+                    <option value="delete">Delete Message</option>
+                    <option value="delete_warn">Delete & Warn User</option>
+                    <option value="delete_timeout">Delete & Timeout User (1h)</option>
+                    <option value="warn">Warn User</option>
+                    <option value="delete_kick">Delete Message & Kick User</option>
+                    <option value="delete_kick_warn">Delete & Kick + Warn User</option>
+                    <option value="ban">Ban User (Delete 24h)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Mass Emoji -->
+            <div class="bg-zinc-900 p-5 rounded-xl border border-zinc-800">
+              <div class="flex justify-between items-start mb-3">
+                <div class="flex items-center gap-2">
+                  <span class="text-lg">😀</span>
+                  <h4 class="font-medium">Mass Emoji</h4>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" id="mass_emoji_enabled" class="sr-only peer feature-toggle" data-settings="massEmojiSettings">
+                  <div class="w-11 h-6 bg-zinc-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                </label>
+              </div>
+              <p class="text-xs text-zinc-500 mb-3">Block excessive emoji usage</p>
+              <div id="massEmojiSettings" class="space-y-3 hidden">
+                <div>
+                  <label class="block text-xs font-medium mb-1 text-zinc-400">Max Emojis</label>
+                  <input type="number" id="mass_emoji_count" min="3" max="50" value="5"
+                         class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                  <label class="block text-xs font-medium mb-1 text-zinc-400">Punishment</label>
+                  <select id="mass_emoji_action" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-indigo-500">
+                    <option value="delete">Delete Message</option>
+                    <option value="delete_warn">Delete & Warn User</option>
+                    <option value="delete_timeout">Delete & Timeout User (1h)</option>
+                    <option value="warn">Warn User</option>
+                    <option value="delete_kick">Delete Message & Kick User</option>
+                    <option value="delete_kick_warn">Delete & Kick + Warn User</option>
+                    <option value="ban">Ban User (Delete 24h)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Spoilers -->
+            <div class="bg-zinc-900 p-5 rounded-xl border border-zinc-800">
+              <div class="flex justify-between items-start mb-3">
+                <div class="flex items-center gap-2">
+                  <span class="text-lg">🙈</span>
+                  <h4 class="font-medium">Spoilers</h4>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" id="spoilers_enabled" class="sr-only peer feature-toggle" data-settings="spoilersSettings">
+                  <div class="w-11 h-6 bg-zinc-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                </label>
+              </div>
+              <p class="text-xs text-zinc-500 mb-3">Block spoiler-tagged content</p>
+              <div id="spoilersSettings" class="space-y-3 hidden">
+                <div>
+                  <label class="block text-xs font-medium mb-1 text-zinc-400">Min Characters</label>
+                  <input type="number" id="spoilers_min_chars" min="1" max="100" value="4"
+                         class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                  <label class="block text-xs font-medium mb-1 text-zinc-400">Punishment</label>
+                  <select id="spoilers_action" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-indigo-500">
+                    <option value="delete">Delete Message</option>
+                    <option value="delete_warn">Delete & Warn User</option>
+                    <option value="delete_timeout">Delete & Timeout User (1h)</option>
+                    <option value="warn">Warn User</option>
+                    <option value="delete_kick">Delete Message & Kick User</option>
+                    <option value="delete_kick_warn">Delete & Kick + Warn User</option>
+                    <option value="ban">Ban User (Delete 24h)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Discord Invites -->
+            <div class="bg-zinc-900 p-5 rounded-xl border border-zinc-800">
+              <div class="flex justify-between items-start mb-3">
+                <div class="flex items-center gap-2">
+                  <span class="text-lg">📨</span>
+                  <h4 class="font-medium">Discord Invites</h4>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" id="invites_enabled" class="sr-only peer feature-toggle" data-settings="invitesSettings">
+                  <div class="w-11 h-6 bg-zinc-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                </label>
+              </div>
+              <p class="text-xs text-zinc-500 mb-3">Block Discord server invite links</p>
+              <div id="invitesSettings" class="space-y-3 hidden">
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" id="invites_ignore_partners" class="rounded bg-zinc-700 border-zinc-600 text-indigo-600 focus:ring-indigo-500">
+                  <span class="text-sm">Ignore Partner Servers</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" id="invites_ignore_verified" class="rounded bg-zinc-700 border-zinc-600 text-indigo-600 focus:ring-indigo-500">
+                  <span class="text-sm">Ignore Verified Servers</span>
+                </label>
+                <div>
+                  <label class="block text-xs font-medium mb-1 text-zinc-400">Punishment</label>
+                  <select id="invites_action" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-indigo-500">
+                    <option value="delete">Delete Message</option>
+                    <option value="delete_warn">Delete & Warn User</option>
+                    <option value="delete_timeout">Delete & Timeout User (1h)</option>
+                    <option value="warn">Warn User</option>
+                    <option value="delete_kick">Delete Message & Kick User</option>
+                    <option value="delete_kick_warn">Delete & Kick + Warn User</option>
+                    <option value="ban">Ban User (Delete 24h)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Website URLs -->
+            <div class="bg-zinc-900 p-5 rounded-xl border border-zinc-800">
+              <div class="flex justify-between items-start mb-3">
+                <div class="flex items-center gap-2">
+                  <span class="text-lg">🔗</span>
+                  <h4 class="font-medium">Website URLs</h4>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" id="links_enabled" class="sr-only peer feature-toggle" data-settings="linksSettings">
+                  <div class="w-11 h-6 bg-zinc-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                </label>
+              </div>
+              <p class="text-xs text-zinc-500 mb-3">Block or whitelist website links</p>
+              <div id="linksSettings" class="space-y-3 hidden">
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" id="links_whitelist_mode" class="rounded bg-zinc-700 border-zinc-600 text-indigo-600 focus:ring-indigo-500">
+                  <span class="text-sm">Whitelist Mode (only allow listed)</span>
+                </label>
+                <div>
+                  <label class="block text-xs font-medium mb-1 text-zinc-400">Allowed Domains</label>
+                  <textarea id="links_whitelist" rows="2" placeholder="discord.com, youtube.com"
+                            class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 resize-none"></textarea>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium mb-1 text-zinc-400">Punishment</label>
+                  <select id="links_action" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-indigo-500">
+                    <option value="delete">Delete Message</option>
+                    <option value="delete_warn">Delete & Warn User</option>
+                    <option value="delete_timeout">Delete & Timeout User (1h)</option>
+                    <option value="warn">Warn User</option>
+                    <option value="delete_kick">Delete Message & Kick User</option>
+                    <option value="delete_kick_warn">Delete & Kick + Warn User</option>
+                    <option value="ban">Ban User (Delete 24h)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- File Extensions -->
+            <div class="bg-zinc-900 p-5 rounded-xl border border-zinc-800">
+              <div class="flex justify-between items-start mb-3">
+                <div class="flex items-center gap-2">
+                  <span class="text-lg">📁</span>
+                  <h4 class="font-medium">File Extensions</h4>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" id="file_extensions_enabled" class="sr-only peer feature-toggle" data-settings="fileExtSettings">
+                  <div class="w-11 h-6 bg-zinc-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                </label>
+              </div>
+              <p class="text-xs text-zinc-500 mb-3">Block files with specific extensions</p>
+              <div id="fileExtSettings" class="space-y-3 hidden">
+                <!-- Whitelist/Blacklist Mode Toggle -->
+                <div class="flex items-center justify-between p-3 bg-zinc-800/50 rounded-lg">
+                  <div>
+                    <span class="text-sm font-medium" id="file_ext_mode_label">Blacklist Mode</span>
+                    <p class="text-xs text-zinc-500" id="file_ext_mode_desc">Block files with these extensions</p>
+                  </div>
+                  <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="file_extensions_whitelist_mode" class="sr-only peer" onchange="updateFileExtModeLabel()">
+                    <div class="w-11 h-6 bg-zinc-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                  </label>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium mb-1 text-zinc-400" id="file_ext_list_label">Blocked Extensions</label>
+                  <textarea id="file_extensions_list" rows="2" placeholder=".exe, .bat, .scr, .js"
+                            class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 resize-none"></textarea>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium mb-1 text-zinc-400">Punishment</label>
+                  <select id="file_extensions_action" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-indigo-500">
+                    <option value="delete">Delete Message</option>
+                    <option value="delete_warn">Delete & Warn User</option>
+                    <option value="delete_timeout">Delete & Timeout User (1h)</option>
+                    <option value="warn">Warn User</option>
+                    <option value="delete_kick">Delete Message & Kick User</option>
+                    <option value="delete_kick_warn">Delete & Kick + Warn User</option>
+                    <option value="ban">Ban User (Delete 24h)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Stickers -->
+            <div class="bg-zinc-900 p-5 rounded-xl border border-zinc-800">
+              <div class="flex justify-between items-start mb-3">
+                <div class="flex items-center gap-2">
+                  <span class="text-lg">🏷️</span>
+                  <h4 class="font-medium">Stickers</h4>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" id="stickers_enabled" class="sr-only peer feature-toggle" data-settings="stickersSettings">
+                  <div class="w-11 h-6 bg-zinc-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                </label>
+              </div>
+              <p class="text-xs text-zinc-500 mb-3">Block sticker messages</p>
+              <div id="stickersSettings" class="space-y-3 hidden">
+                <div>
+                  <label class="block text-xs font-medium mb-1 text-zinc-400">Punishment</label>
+                  <select id="stickers_action" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-indigo-500">
+                    <option value="delete">Delete Message</option>
+                    <option value="delete_warn">Delete & Warn User</option>
+                    <option value="delete_timeout">Delete & Timeout User (1h)</option>
+                    <option value="warn">Warn User</option>
+                    <option value="delete_kick">Delete Message & Kick User</option>
+                    <option value="delete_kick_warn">Delete & Kick + Warn User</option>
+                    <option value="ban">Ban User (Delete 24h)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Zalgo Text -->
+            <div class="bg-zinc-900 p-5 rounded-xl border border-zinc-800">
+              <div class="flex justify-between items-start mb-3">
+                <div class="flex items-center gap-2">
+                  <span class="text-lg">👾</span>
+                  <h4 class="font-medium">Zalgo Text</h4>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" id="zalgo_enabled" class="sr-only peer feature-toggle" data-settings="zalgoSettings">
+                  <div class="w-11 h-6 bg-zinc-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                </label>
+              </div>
+              <p class="text-xs text-zinc-500 mb-3">Block glitchy/corrupted text</p>
+              <div id="zalgoSettings" class="space-y-3 hidden">
+                <div>
+                  <label class="block text-xs font-medium mb-1 text-zinc-400">Punishment</label>
+                  <select id="zalgo_action" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-indigo-500">
+                    <option value="delete">Delete Message</option>
+                    <option value="delete_warn">Delete & Warn User</option>
+                    <option value="delete_timeout">Delete & Timeout User (1h)</option>
+                    <option value="warn">Warn User</option>
+                    <option value="delete_kick">Delete Message & Kick User</option>
+                    <option value="delete_kick_warn">Delete & Kick + Warn User</option>
+                    <option value="ban">Ban User (Delete 24h)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Phishing URLs -->
+            <div class="bg-zinc-900 p-5 rounded-xl border border-zinc-800">
+              <div class="flex justify-between items-start mb-3">
+                <div class="flex items-center gap-2">
+                  <span class="text-lg">🎣</span>
+                  <h4 class="font-medium">Phishing URLs</h4>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" id="phishing_enabled" class="sr-only peer feature-toggle" data-settings="phishingSettings">
+                  <div class="w-11 h-6 bg-zinc-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                </label>
+              </div>
+              <p class="text-xs text-zinc-500 mb-3">Block known phishing/scam links</p>
+              <div id="phishingSettings" class="space-y-3 hidden">
+                <div>
+                  <label class="block text-xs font-medium mb-1 text-zinc-400">Punishment</label>
+                  <select id="phishing_action" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-indigo-500">
+                    <option value="delete">Delete Message</option>
+                    <option value="delete_warn">Delete & Warn User</option>
+                    <option value="delete_timeout">Delete & Timeout User (1h)</option>
+                    <option value="warn">Warn User</option>
+                    <option value="delete_kick">Delete Message & Kick User</option>
+                    <option value="delete_kick_warn">Delete & Kick + Warn User</option>
+                    <option value="ban">Ban User (Delete 24h)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Phone Numbers -->
+            <div class="bg-zinc-900 p-5 rounded-xl border border-zinc-800">
+              <div class="flex justify-between items-start mb-3">
+                <div class="flex items-center gap-2">
+                  <span class="text-lg">📱</span>
+                  <h4 class="font-medium">Phone Numbers</h4>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" id="phone_numbers_enabled" class="sr-only peer feature-toggle" data-settings="phoneSettings">
+                  <div class="w-11 h-6 bg-zinc-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                </label>
+              </div>
+              <p class="text-xs text-zinc-500 mb-3">Block phone numbers in messages</p>
+              <div id="phoneSettings" class="space-y-3 hidden">
+                <div>
+                  <label class="block text-xs font-medium mb-1 text-zinc-400">Punishment</label>
+                  <select id="phone_numbers_action" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-indigo-500">
+                    <option value="delete">Delete Message</option>
+                    <option value="delete_warn">Delete & Warn User</option>
+                    <option value="delete_timeout">Delete & Timeout User (1h)</option>
+                    <option value="warn">Warn User</option>
+                    <option value="delete_kick">Delete Message & Kick User</option>
+                    <option value="delete_kick_warn">Delete & Kick + Warn User</option>
+                    <option value="ban">Ban User (Delete 24h)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Markdown Headers -->
+            <div class="bg-zinc-900 p-5 rounded-xl border border-zinc-800">
+              <div class="flex justify-between items-start mb-3">
+                <div class="flex items-center gap-2">
+                  <span class="text-lg">📑</span>
+                  <h4 class="font-medium">Markdown Headers</h4>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" id="markdown_headers_enabled" class="sr-only peer feature-toggle" data-settings="markdownSettings">
+                  <div class="w-11 h-6 bg-zinc-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                </label>
+              </div>
+              <p class="text-xs text-zinc-500 mb-3">Block large markdown headers (# ##)</p>
+              <div id="markdownSettings" class="space-y-3 hidden">
+                <div>
+                  <label class="block text-xs font-medium mb-1 text-zinc-400">Punishment</label>
+                  <select id="markdown_headers_action" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-indigo-500">
+                    <option value="delete">Delete Message</option>
+                    <option value="delete_warn">Delete & Warn User</option>
+                    <option value="delete_timeout">Delete & Timeout User (1h)</option>
+                    <option value="warn">Warn User</option>
+                    <option value="delete_kick">Delete Message & Kick User</option>
+                    <option value="delete_kick_warn">Delete & Kick + Warn User</option>
+                    <option value="ban">Ban User (Delete 24h)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Anti-Spam -->
+            <div class="bg-zinc-900 p-5 rounded-xl border border-zinc-800">
+              <div class="flex justify-between items-start mb-3">
+                <div class="flex items-center gap-2">
+                  <span class="text-lg">🚫</span>
+                  <h4 class="font-medium">Anti-Spam</h4>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" id="spam_enabled" class="sr-only peer feature-toggle" data-settings="spamSettings">
+                  <div class="w-11 h-6 bg-zinc-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                </label>
+              </div>
+              <p class="text-xs text-zinc-500 mb-3">Detect rapid message spam</p>
+              <div id="spamSettings" class="space-y-3 hidden">
+                <div class="grid grid-cols-2 gap-2">
+                  <div>
+                    <label class="block text-xs font-medium mb-1 text-zinc-400">Message Threshold</label>
+                    <input type="number" id="spam_threshold" min="3" max="20" value="5"
+                           class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-indigo-500">
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium mb-1 text-zinc-400">Time Window (ms)</label>
+                    <input type="number" id="spam_interval" min="1000" max="30000" step="1000" value="5000"
+                           class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-indigo-500">
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium mb-1 text-zinc-400">Punishment</label>
+                  <select id="spam_action" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-indigo-500">
+                    <option value="delete">Delete Message</option>
+                    <option value="delete_warn">Delete & Warn User</option>
+                    <option value="delete_timeout">Delete & Timeout User (1h)</option>
+                    <option value="warn">Warn User</option>
+                    <option value="delete_kick">Delete Message & Kick User</option>
+                    <option value="delete_kick_warn">Delete & Kick + Warn User</option>
+                    <option value="ban">Ban User (Delete 24h)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Member Management -->
+          <h3 class="text-lg font-semibold mt-8 mb-4">Member Management</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+            <!-- Auto Dehoist -->
+            <div class="bg-zinc-900 p-5 rounded-xl border border-zinc-800">
+              <div class="flex justify-between items-start mb-3">
+                <div class="flex items-center gap-2">
+                  <span class="text-lg">⬆️</span>
+                  <h4 class="font-medium">Auto Dehoist</h4>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" id="dehoist_enabled" class="sr-only peer">
+                  <div class="w-11 h-6 bg-zinc-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                </label>
+              </div>
+              <p class="text-xs text-zinc-500">Automatically rename users with hoisted names (starting with !, @, etc.)</p>
+            </div>
+
+          </div>
+
+          <!-- Actions - Desktop -->
+          <div class="hidden md:flex gap-4 mt-8">
+            <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 px-6 py-2.5 rounded-lg font-medium transition">
+              Save Changes
+            </button>
+            <button type="button" onclick="loadSettings()" class="bg-zinc-800 hover:bg-zinc-700 px-6 py-2.5 rounded-lg font-medium transition">
+              Reset
+            </button>
+          </div>
+        </form>
+
+        <div id="saveStatus" class="mt-4 px-4 py-3 rounded-lg text-sm hidden"></div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Mobile Fixed Save Bar -->
+  <div class="fixed bottom-0 left-0 right-0 bg-zinc-900 border-t border-zinc-800 p-4 flex gap-3 md:hidden z-50">
+    <button type="button" onclick="document.getElementById('automodForm').dispatchEvent(new Event('submit', {cancelable: true, bubbles: true}))" class="flex-1 bg-indigo-600 hover:bg-indigo-700 px-4 py-3 rounded-lg font-medium transition">
+      Save Changes
+    </button>
+    <button type="button" onclick="loadSettings()" class="bg-zinc-800 hover:bg-zinc-700 px-4 py-3 rounded-lg font-medium transition">
+      Reset
+    </button>
+  </div>
+
+  <!-- Add padding at bottom for mobile save bar -->
+  <div class="h-20 md:hidden"></div>
+
+  <script>
+    function onGuildReady(data) {
+      document.title = `Auto-Mod - ${data.name} - ShaggyBot`;
+
+      // Populate log channel
+      const logChannelSelect = document.getElementById('log_channel');
+      data.channels.forEach(channel => {
+        const option = document.createElement('option');
+        option.value = channel.id;
+        option.textContent = `#${channel.name}`;
+        logChannelSelect.appendChild(option);
+      });
+
+      // Populate exempt roles
+      const roleSelect = document.getElementById('exempt_roles');
+      data.roles.forEach(role => {
+        const option = document.createElement('option');
+        option.value = role.id;
+        option.textContent = `@${role.name}`;
+        roleSelect.appendChild(option);
+      });
+
+      // Populate exempt channels
+      const channelSelect = document.getElementById('exempt_channels');
+      data.channels.forEach(channel => {
+        const option = document.createElement('option');
+        option.value = channel.id;
+        option.textContent = `#${channel.name}`;
+        channelSelect.appendChild(option);
+      });
+
+      initMultiSelects();
+      loadSettings();
+    }
+
+    function setMultiSelect(id, values) {
+      const select = document.getElementById(id);
+      if (!select) return;
+      if (select.multiSelect) {
+        select.multiSelect.setValues(values || []);
+      } else {
+        Array.from(select.options).forEach(opt => opt.selected = (values || []).includes(opt.value));
+      }
+    }
+
+    function getMultiSelect(id) {
+      const select = document.getElementById(id);
+      if (!select) return [];
+      if (select.multiSelect) {
+        return select.multiSelect.getValues();
+      }
+      return Array.from(select.selectedOptions).map(o => o.value);
+    }
+
+    function updateFileExtModeLabel() {
+      const isWhitelist = document.getElementById('file_extensions_whitelist_mode').checked;
+      document.getElementById('file_ext_mode_label').textContent = isWhitelist ? 'Whitelist Mode' : 'Blacklist Mode';
+      document.getElementById('file_ext_mode_desc').textContent = isWhitelist ? 'Only allow files with these extensions' : 'Block files with these extensions';
+      document.getElementById('file_ext_list_label').textContent = isWhitelist ? 'Allowed Extensions' : 'Blocked Extensions';
+    }
+
+    function loadSettings() {
+      fetch(`/api/guilds/${guildId}/automod`).then(res => res.json()).then(settings => {
+        // Master toggle
+        document.getElementById('enabled').checked = settings.enabled;
+        
+        // General settings
+        document.getElementById('log_channel').value = settings.log_channel || '';
+        document.getElementById('exclude_admins').checked = settings.exclude_admins;
+        document.getElementById('exclude_mods').checked = settings.exclude_mods;
+        document.getElementById('exclude_bots').checked = settings.exclude_bots;
+        setMultiSelect('exempt_roles', settings.exempt_roles || []);
+        setMultiSelect('exempt_channels', settings.exempt_channels || []);
+
+        // Word Blacklist
+        document.getElementById('bad_words_enabled').checked = settings.bad_words_enabled;
+        document.getElementById('bad_words_use_default').checked = settings.bad_words_use_default;
+        document.getElementById('bad_words_list').value = (settings.bad_words_list || []).join(', ');
+        document.getElementById('bad_words_action').value = settings.bad_words_action || 'delete';
+
+        // Mass Caps
+        document.getElementById('caps_enabled').checked = settings.caps_enabled;
+        document.getElementById('caps_min_chars').value = settings.caps_min_chars || 8;
+        document.getElementById('caps_percentage').value = settings.caps_percentage || 70;
+        document.getElementById('caps_action').value = settings.caps_action || 'delete';
+
+        // Duplicate Characters
+        document.getElementById('duplicate_chars_enabled').checked = settings.duplicate_chars_enabled;
+        document.getElementById('duplicate_chars_min').value = settings.duplicate_chars_min || 4;
+        document.getElementById('duplicate_chars_percentage').value = settings.duplicate_chars_percentage || 75;
+        document.getElementById('duplicate_chars_action').value = settings.duplicate_chars_action || 'delete';
+
+        // Duplicate Words
+        document.getElementById('duplicate_words_enabled').checked = settings.duplicate_words_enabled;
+        document.getElementById('duplicate_words_count').value = settings.duplicate_words_count || 5;
+        document.getElementById('duplicate_words_action').value = settings.duplicate_words_action || 'delete';
+
+        // Mass Mentions
+        document.getElementById('mass_mentions_enabled').checked = settings.mass_mentions_enabled;
+        document.getElementById('mass_mentions_count').value = settings.mass_mentions_count || 5;
+        document.getElementById('mass_mentions_action').value = settings.mass_mentions_action || 'delete_warn';
+
+        // Mass Emoji
+        document.getElementById('mass_emoji_enabled').checked = settings.mass_emoji_enabled;
+        document.getElementById('mass_emoji_count').value = settings.mass_emoji_count || 5;
+        document.getElementById('mass_emoji_action').value = settings.mass_emoji_action || 'delete';
+
+        // Spoilers
+        document.getElementById('spoilers_enabled').checked = settings.spoilers_enabled;
+        document.getElementById('spoilers_min_chars').value = settings.spoilers_min_chars || 4;
+        document.getElementById('spoilers_action').value = settings.spoilers_action || 'delete';
+
+        // Discord Invites
+        document.getElementById('invites_enabled').checked = settings.invites_enabled;
+        document.getElementById('invites_ignore_partners').checked = settings.invites_ignore_partners;
+        document.getElementById('invites_ignore_verified').checked = settings.invites_ignore_verified;
+        document.getElementById('invites_action').value = settings.invites_action || 'delete_warn';
+
+        // Website URLs
+        document.getElementById('links_enabled').checked = settings.links_enabled;
+        document.getElementById('links_whitelist_mode').checked = settings.links_whitelist_mode;
+        document.getElementById('links_whitelist').value = (settings.links_whitelist || []).join(', ');
+        document.getElementById('links_action').value = settings.links_action || 'delete';
+
+        // File Extensions
+        document.getElementById('file_extensions_enabled').checked = settings.file_extensions_enabled;
+        document.getElementById('file_extensions_whitelist_mode').checked = settings.file_extensions_whitelist_mode;
+        document.getElementById('file_extensions_list').value = (settings.file_extensions_list || []).join(', ');
+        document.getElementById('file_extensions_action').value = settings.file_extensions_action || 'delete';
+        updateFileExtModeLabel();
+
+        // Stickers
+        document.getElementById('stickers_enabled').checked = settings.stickers_enabled;
+        document.getElementById('stickers_action').value = settings.stickers_action || 'delete';
+
+        // Zalgo
+        document.getElementById('zalgo_enabled').checked = settings.zalgo_enabled;
+        document.getElementById('zalgo_action').value = settings.zalgo_action || 'delete';
+
+        // Phishing
+        document.getElementById('phishing_enabled').checked = settings.phishing_enabled;
+        document.getElementById('phishing_action').value = settings.phishing_action || 'ban';
+
+        // Phone Numbers
+        document.getElementById('phone_numbers_enabled').checked = settings.phone_numbers_enabled;
+        document.getElementById('phone_numbers_action').value = settings.phone_numbers_action || 'delete_warn';
+
+        // Markdown Headers
+        document.getElementById('markdown_headers_enabled').checked = settings.markdown_headers_enabled;
+        document.getElementById('markdown_headers_action').value = settings.markdown_headers_action || 'delete';
+
+        // Anti-Spam
+        document.getElementById('spam_enabled').checked = settings.spam_enabled;
+        document.getElementById('spam_threshold').value = settings.spam_threshold || 5;
+        document.getElementById('spam_interval').value = settings.spam_interval || 5000;
+        document.getElementById('spam_action').value = settings.spam_action || 'mute';
+
+        // Dehoist
+        document.getElementById('dehoist_enabled').checked = settings.dehoist_enabled;
+
+        updateSubsettingsVisibility();
+      });
+    }
+
+    function updateSubsettingsVisibility() {
+      document.querySelectorAll('.feature-toggle').forEach(toggle => {
+        const settingsId = toggle.dataset.settings;
+        if (settingsId) {
+          const settings = document.getElementById(settingsId);
+          if (settings) {
+            settings.classList.toggle('hidden', !toggle.checked);
+          }
+        }
+      });
+    }
+
+    document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.addEventListener('change', updateSubsettingsVisibility));
+
+    document.getElementById('automodForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const data = {
+        enabled: document.getElementById('enabled').checked ? 1 : 0,
+        log_channel: document.getElementById('log_channel').value || null,
+        exclude_admins: document.getElementById('exclude_admins').checked ? 1 : 0,
+        exclude_mods: document.getElementById('exclude_mods').checked ? 1 : 0,
+        exclude_bots: document.getElementById('exclude_bots').checked ? 1 : 0,
+        exempt_roles: getMultiSelect('exempt_roles'),
+        exempt_channels: getMultiSelect('exempt_channels'),
+
+        // Word Blacklist
+        bad_words_enabled: document.getElementById('bad_words_enabled').checked ? 1 : 0,
+        bad_words_use_default: document.getElementById('bad_words_use_default').checked ? 1 : 0,
+        bad_words_list: document.getElementById('bad_words_list').value.split(',').map(w => w.trim().toLowerCase()).filter(w => w.length > 0),
+        bad_words_action: document.getElementById('bad_words_action').value,
+
+        // Mass Caps
+        caps_enabled: document.getElementById('caps_enabled').checked ? 1 : 0,
+        caps_min_chars: parseInt(document.getElementById('caps_min_chars').value),
+        caps_percentage: parseInt(document.getElementById('caps_percentage').value),
+        caps_action: document.getElementById('caps_action').value,
+
+        // Duplicate Characters
+        duplicate_chars_enabled: document.getElementById('duplicate_chars_enabled').checked ? 1 : 0,
+        duplicate_chars_min: parseInt(document.getElementById('duplicate_chars_min').value),
+        duplicate_chars_percentage: parseInt(document.getElementById('duplicate_chars_percentage').value),
+        duplicate_chars_action: document.getElementById('duplicate_chars_action').value,
+
+        // Duplicate Words
+        duplicate_words_enabled: document.getElementById('duplicate_words_enabled').checked ? 1 : 0,
+        duplicate_words_count: parseInt(document.getElementById('duplicate_words_count').value),
+        duplicate_words_action: document.getElementById('duplicate_words_action').value,
+
+        // Mass Mentions
+        mass_mentions_enabled: document.getElementById('mass_mentions_enabled').checked ? 1 : 0,
+        mass_mentions_count: parseInt(document.getElementById('mass_mentions_count').value),
+        mass_mentions_action: document.getElementById('mass_mentions_action').value,
+
+        // Mass Emoji
+        mass_emoji_enabled: document.getElementById('mass_emoji_enabled').checked ? 1 : 0,
+        mass_emoji_count: parseInt(document.getElementById('mass_emoji_count').value),
+        mass_emoji_action: document.getElementById('mass_emoji_action').value,
+
+        // Spoilers
+        spoilers_enabled: document.getElementById('spoilers_enabled').checked ? 1 : 0,
+        spoilers_min_chars: parseInt(document.getElementById('spoilers_min_chars').value),
+        spoilers_action: document.getElementById('spoilers_action').value,
+
+        // Discord Invites
+        invites_enabled: document.getElementById('invites_enabled').checked ? 1 : 0,
+        invites_ignore_partners: document.getElementById('invites_ignore_partners').checked ? 1 : 0,
+        invites_ignore_verified: document.getElementById('invites_ignore_verified').checked ? 1 : 0,
+        invites_action: document.getElementById('invites_action').value,
+
+        // Website URLs
+        links_enabled: document.getElementById('links_enabled').checked ? 1 : 0,
+        links_whitelist_mode: document.getElementById('links_whitelist_mode').checked ? 1 : 0,
+        links_whitelist: document.getElementById('links_whitelist').value.split(',').map(d => d.trim().toLowerCase()).filter(d => d.length > 0),
+        links_action: document.getElementById('links_action').value,
+
+        // File Extensions
+        file_extensions_enabled: document.getElementById('file_extensions_enabled').checked ? 1 : 0,
+        file_extensions_whitelist_mode: document.getElementById('file_extensions_whitelist_mode').checked ? 1 : 0,
+        file_extensions_list: document.getElementById('file_extensions_list').value.split(',').map(e => e.trim().toLowerCase()).filter(e => e.length > 0),
+        file_extensions_action: document.getElementById('file_extensions_action').value,
+
+        // Stickers
+        stickers_enabled: document.getElementById('stickers_enabled').checked ? 1 : 0,
+        stickers_action: document.getElementById('stickers_action').value,
+
+        // Zalgo
+        zalgo_enabled: document.getElementById('zalgo_enabled').checked ? 1 : 0,
+        zalgo_action: document.getElementById('zalgo_action').value,
+
+        // Phishing
+        phishing_enabled: document.getElementById('phishing_enabled').checked ? 1 : 0,
+        phishing_action: document.getElementById('phishing_action').value,
+
+        // Phone Numbers
+        phone_numbers_enabled: document.getElementById('phone_numbers_enabled').checked ? 1 : 0,
+        phone_numbers_action: document.getElementById('phone_numbers_action').value,
+
+        // Markdown Headers
+        markdown_headers_enabled: document.getElementById('markdown_headers_enabled').checked ? 1 : 0,
+        markdown_headers_action: document.getElementById('markdown_headers_action').value,
+
+        // Anti-Spam
+        spam_enabled: document.getElementById('spam_enabled').checked ? 1 : 0,
+        spam_threshold: parseInt(document.getElementById('spam_threshold').value),
+        spam_interval: parseInt(document.getElementById('spam_interval').value),
+        spam_action: document.getElementById('spam_action').value,
+
+        // Dehoist
+        dehoist_enabled: document.getElementById('dehoist_enabled').checked ? 1 : 0
+      };
+
+      const status = document.getElementById('saveStatus');
+      status.textContent = 'Saving...';
+      status.className = 'mt-4 px-4 py-3 rounded-lg text-sm bg-zinc-800 text-zinc-400';
+
+      try {
+        const res = await fetch(`/api/guilds/${guildId}/automod`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        const result = await res.json();
+        if (res.ok) {
+          if (result._warning) {
+            status.textContent = `⚠️ Settings saved with warnings: ${result._warning}`;
+            status.className = 'mt-4 px-4 py-3 rounded-lg text-sm bg-yellow-500/20 text-yellow-400';
+            console.warn('Automod save warning:', result._warning);
+          } else {
+            status.textContent = '✓ Auto-mod settings saved successfully!';
+            status.className = 'mt-4 px-4 py-3 rounded-lg text-sm bg-green-500/20 text-green-400';
+          }
+        } else throw new Error(result.error || 'Failed');
+      } catch (err) {
+        status.textContent = '✗ Failed to save settings. Please try again.';
+        status.className = 'mt-4 px-4 py-3 rounded-lg text-sm bg-red-500/20 text-red-400';
+        console.error('Automod save error:', err);
+      }
+      setTimeout(() => { status.className = 'mt-4 px-4 py-3 rounded-lg text-sm hidden'; }, 4000);
+    });
+  </script>
+  <%- include('partials/scripts/guild-loader') %>
+  <%- include('partials/scripts/multi-select') %>
+</body>
+</html>

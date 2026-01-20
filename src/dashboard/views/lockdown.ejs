@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title: title }) %>
+  <style>
+    .lockdown-active {
+      animation: pulse-red 2s infinite;
+    }
+    @keyframes pulse-red {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+      50% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+    }
+  </style>
+</head>
+<body class="bg-zinc-950 text-white min-h-screen guild-page">
+  <%- include('partials/background') %>
+  <%- include('partials/navbar', { requiresAuth: true, activePage: 'dashboard' }) %>
+
+  <div class="flex min-h-[calc(100vh-65px)] relative z-10">
+    <%- include('partials/sidebar', { activeSection: 'lockdown' }) %>
+
+    <!-- Main Content -->
+    <main class="flex-1 p-4 md:p-8 overflow-y-auto lg:ml-72">
+      <div class="max-w-4xl mx-auto">
+        <div class="mb-6 md:mb-8">
+          <h1 class="text-xl md:text-2xl font-bold mb-2">🔒 Lockdown</h1>
+          <p class="text-zinc-400 text-sm md:text-base">Quickly lock down channels during emergencies or raids.</p>
+        </div>
+
+        <!-- Status Card -->
+        <div id="statusCard" class="bg-zinc-900 border border-zinc-800 rounded-xl p-6 mb-6">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="font-semibold text-lg" id="statusTitle">Lockdown Status</h3>
+              <p class="text-zinc-400 text-sm" id="statusText">Loading...</p>
+            </div>
+            <div id="statusIndicator" class="w-4 h-4 rounded-full bg-zinc-600"></div>
+          </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <button id="startLockdownBtn" onclick="startLockdown()" 
+                  class="bg-red-600 hover:bg-red-700 disabled:bg-zinc-700 disabled:cursor-not-allowed px-6 py-4 rounded-xl font-medium transition flex items-center justify-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+            </svg>
+            Start Lockdown
+          </button>
+          <button id="endLockdownBtn" onclick="endLockdown()" 
+                  class="bg-green-600 hover:bg-green-700 disabled:bg-zinc-700 disabled:cursor-not-allowed px-6 py-4 rounded-xl font-medium transition flex items-center justify-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"/>
+            </svg>
+            End Lockdown
+          </button>
+        </div>
+
+        <!-- Lockdown Message (for start) -->
+        <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6 mb-6">
+          <h3 class="font-semibold mb-3">Lockdown Message (Optional)</h3>
+          <p class="text-zinc-400 text-sm mb-3">This message will be posted in each locked channel when you start a lockdown.</p>
+          <textarea id="lockdownMessage" rows="2" 
+                    placeholder="e.g., This channel is temporarily locked. We'll be back shortly."
+                    class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 focus:outline-none focus:border-indigo-500 resize-none"></textarea>
+        </div>
+
+        <!-- Setup Info -->
+        <div class="bg-amber-900/30 border border-amber-700 rounded-xl p-6 mb-6">
+          <h3 class="font-semibold mb-3 flex items-center gap-2">
+            <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            Setup Requirements
+          </h3>
+          <div class="text-sm text-zinc-300 space-y-2">
+            <p><strong>How Lockdown Works:</strong></p>
+            <ul class="list-disc list-inside ml-2 space-y-1 text-zinc-400">
+              <li>When activated, the bot removes the <strong>Send Messages</strong> permission for <code class="bg-zinc-800 px-1 rounded">@everyone</code> in all configured channels</li>
+              <li>When ended, the permission is reset to inherit from the channel/category settings</li>
+            </ul>
+            <p class="mt-3"><strong>Discord Permission Setup:</strong></p>
+            <ul class="list-disc list-inside ml-2 space-y-1 text-zinc-400">
+              <li>The bot needs the <strong>Manage Channels</strong> permission</li>
+              <li>The bot's role must be <strong>higher</strong> than any role that has Send Messages overwrites in the channels</li>
+              <li>For staff to bypass lockdown, give their roles explicit <strong>Send Messages: Allow</strong> in those channels</li>
+            </ul>
+            <p class="mt-3"><strong>Tip:</strong> Test the lockdown in a private channel first to make sure permissions are set up correctly!</p>
+          </div>
+        </div>
+
+        <!-- Channel Configuration -->
+        <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6 mb-6">
+          <h3 class="font-semibold mb-3">Lockdown Channels</h3>
+          <p class="text-zinc-400 text-sm mb-4">Select which channels should be locked when you run the lockdown command or click the button above.</p>
+          
+          <!-- Multi-select Channel Selector -->
+          <select id="lockdown_channels" multiple data-placeholder="Click to select channels..."
+                  class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 focus:outline-none focus:border-indigo-500 transition min-h-[100px] channel-select">
+          </select>
+          <p class="text-xs text-zinc-500 mt-1.5">These channels will be locked during a lockdown</p>
+        </div>
+
+        <!-- Save Button -->
+        <div class="flex gap-4">
+          <button onclick="saveSettings()" class="bg-indigo-600 hover:bg-indigo-700 px-6 py-2.5 rounded-lg font-medium transition">
+            Save Channel Configuration
+          </button>
+        </div>
+
+        <div id="saveStatus" class="mt-4 px-4 py-3 rounded-lg text-sm hidden"></div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    let guildChannels = [];
+    let selectedChannelIds = [];
+    let lockdownActive = false;
+
+    function onGuildReady(data) {
+      document.title = `Lockdown - ${data.name} - ShaggyBot`;
+      
+      // Store channels and populate multi-select
+      guildChannels = data.channels;
+      const select = document.getElementById('lockdown_channels');
+      
+      data.channels.forEach(channel => {
+        const option = document.createElement('option');
+        option.value = channel.id;
+        option.textContent = `#${channel.name}`;
+        select.appendChild(option);
+      });
+
+      // Initialize multi-selects after options are populated
+      initMultiSelects();
+
+      loadSettings();
+    }
+
+    async function loadSettings() {
+      try {
+        const res = await fetch(`/api/guilds/${guildId}/lockdown`);
+        const data = await res.json();
+        
+        selectedChannelIds = data.channels || [];
+        lockdownActive = data.active;
+        
+        // Set the multi-select values
+        setMultiSelect('lockdown_channels', selectedChannelIds);
+        updateStatus();
+      } catch (err) {
+        console.error('Failed to load settings:', err);
+      }
+    }
+
+    function setMultiSelect(id, values) {
+      const select = document.getElementById(id);
+      if (!select) return;
+      
+      // Use the multi-select component if available
+      if (select.multiSelect) {
+        select.multiSelect.setValues(values);
+      } else {
+        // Fallback for native select
+        Array.from(select.options).forEach(option => {
+          option.selected = values.includes(option.value);
+        });
+      }
+    }
+
+    function getMultiSelect(id) {
+      const select = document.getElementById(id);
+      if (!select) return [];
+      
+      // Use the multi-select component if available
+      if (select.multiSelect) {
+        return select.multiSelect.getValues();
+      }
+      return Array.from(select.selectedOptions).map(o => o.value);
+    }
+
+    function updateStatus() {
+      const statusCard = document.getElementById('statusCard');
+      const statusTitle = document.getElementById('statusTitle');
+      const statusText = document.getElementById('statusText');
+      const statusIndicator = document.getElementById('statusIndicator');
+      const startBtn = document.getElementById('startLockdownBtn');
+      const endBtn = document.getElementById('endLockdownBtn');
+
+      if (lockdownActive) {
+        statusCard.classList.remove('border-zinc-800');
+        statusCard.classList.add('border-red-600', 'lockdown-active');
+        statusIndicator.classList.remove('bg-zinc-600', 'bg-green-500');
+        statusIndicator.classList.add('bg-red-500');
+        statusTitle.textContent = '🔒 Lockdown Active';
+        statusText.textContent = `${selectedChannelIds.length} channel(s) are currently locked.`;
+        startBtn.disabled = true;
+        endBtn.disabled = false;
+      } else {
+        statusCard.classList.remove('border-red-600', 'lockdown-active');
+        statusCard.classList.add('border-zinc-800');
+        statusIndicator.classList.remove('bg-red-500');
+        statusIndicator.classList.add('bg-green-500');
+        statusTitle.textContent = '🔓 No Active Lockdown';
+        statusText.textContent = selectedChannelIds.length > 0 
+          ? `${selectedChannelIds.length} channel(s) configured and ready.`
+          : 'Configure channels below to enable lockdown.';
+        startBtn.disabled = selectedChannelIds.length === 0;
+        endBtn.disabled = true;
+      }
+    }
+
+    async function saveSettings() {
+      const statusEl = document.getElementById('saveStatus');
+      
+      // Get channels from multi-select
+      selectedChannelIds = getMultiSelect('lockdown_channels');
+      
+      try {
+        const res = await fetch(`/api/guilds/${guildId}/lockdown`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ channels: selectedChannelIds })
+        });
+        
+        if (!res.ok) throw new Error('Failed to save');
+        
+        updateStatus();
+        
+        statusEl.className = 'mt-4 px-4 py-3 rounded-lg text-sm bg-green-900/50 text-green-300';
+        statusEl.textContent = '✓ Channel configuration saved!';
+        statusEl.classList.remove('hidden');
+        
+        setTimeout(() => statusEl.classList.add('hidden'), 3000);
+      } catch (err) {
+        statusEl.className = 'mt-4 px-4 py-3 rounded-lg text-sm bg-red-900/50 text-red-300';
+        statusEl.textContent = '✗ Failed to save settings. Please try again.';
+        statusEl.classList.remove('hidden');
+      }
+    }
+
+    async function startLockdown() {
+      // Get current selection from multi-select
+      selectedChannelIds = getMultiSelect('lockdown_channels');
+      
+      if (selectedChannelIds.length === 0) {
+        alert('Please configure lockdown channels first.');
+        return;
+      }
+      
+      if (!confirm('Are you sure you want to start a lockdown? This will prevent users from sending messages in the configured channels.')) {
+        return;
+      }
+
+      const message = document.getElementById('lockdownMessage').value.trim();
+      const startBtn = document.getElementById('startLockdownBtn');
+      startBtn.disabled = true;
+      startBtn.innerHTML = '<span class="animate-spin">⏳</span> Starting...';
+
+      try {
+        const res = await fetch(`/api/guilds/${guildId}/lockdown/start`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message })
+        });
+        
+        const data = await res.json();
+        
+        if (!res.ok) {
+          throw new Error(data.error || 'Failed to start lockdown');
+        }
+        
+        lockdownActive = true;
+        updateStatus();
+        
+        let statusMsg = `✓ Lockdown started! Locked ${data.lockedChannels.length} channel(s).`;
+        if (data.failedChannels.length > 0) {
+          statusMsg += ` Failed to lock ${data.failedChannels.length} channel(s).`;
+        }
+        
+        const statusEl = document.getElementById('saveStatus');
+        statusEl.className = 'mt-4 px-4 py-3 rounded-lg text-sm bg-red-900/50 text-red-300';
+        statusEl.textContent = statusMsg;
+        statusEl.classList.remove('hidden');
+      } catch (err) {
+        alert('Failed to start lockdown: ' + err.message);
+        startBtn.disabled = false;
+      }
+      
+      startBtn.innerHTML = `
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+        </svg>
+        Start Lockdown
+      `;
+    }
+
+    async function endLockdown() {
+      if (!confirm('Are you sure you want to end the lockdown? This will restore messaging permissions in all locked channels.')) {
+        return;
+      }
+
+      const endBtn = document.getElementById('endLockdownBtn');
+      endBtn.disabled = true;
+      endBtn.innerHTML = '<span class="animate-spin">⏳</span> Ending...';
+
+      try {
+        const res = await fetch(`/api/guilds/${guildId}/lockdown/end`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        
+        const data = await res.json();
+        
+        if (!res.ok) {
+          throw new Error(data.error || 'Failed to end lockdown');
+        }
+        
+        lockdownActive = false;
+        updateStatus();
+        
+        let statusMsg = `✓ Lockdown ended! Unlocked ${data.unlockedChannels.length} channel(s).`;
+        if (data.failedChannels.length > 0) {
+          statusMsg += ` Failed to unlock ${data.failedChannels.length} channel(s).`;
+        }
+        
+        const statusEl = document.getElementById('saveStatus');
+        statusEl.className = 'mt-4 px-4 py-3 rounded-lg text-sm bg-green-900/50 text-green-300';
+        statusEl.textContent = statusMsg;
+        statusEl.classList.remove('hidden');
+        
+        setTimeout(() => statusEl.classList.add('hidden'), 5000);
+      } catch (err) {
+        alert('Failed to end lockdown: ' + err.message);
+        endBtn.disabled = false;
+      }
+      
+      endBtn.innerHTML = `
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"/>
+        </svg>
+        End Lockdown
+      `;
+    }
+  </script>
+  <%- include('partials/scripts/guild-loader') %>
+  <%- include('partials/scripts/multi-select') %>
+</body>
+</html>

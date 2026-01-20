@@ -1,0 +1,47 @@
+<nav class="flex justify-between items-center px-4 md:px-6 py-4 bg-zinc-900 border-b border-zinc-800 sticky top-0 z-50">
+  <div class="flex items-center gap-3">
+    <!-- Mobile menu button (only shown on pages with sidebar) -->
+    <button id="mobileMenuBtn" class="lg:hidden p-2 -ml-2 text-zinc-400 hover:text-white hidden" onclick="toggleMobileSidebar()">
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+      </svg>
+    </button>
+    <a href="/" class="flex items-center gap-2">
+    <img src="/static/img/logo.png" alt="ShaggyBot" class="w-8 h-8 squircle" onerror="this.style.display='none'">
+    <span class="text-xl font-bold hidden sm:inline">ShaggyBot</span>
+    </a>
+  </div>
+  
+  <!-- Desktop Navigation -->
+  <div class="hidden md:flex items-center gap-6">
+    <a href="/" class="text-zinc-400 hover:text-white font-medium transition<%= typeof activePage !== 'undefined' && activePage === 'home' ? ' !text-white' : '' %>">Home</a>
+    <a href="/dashboard" id="dashboardLink" class="text-zinc-400 hover:text-white font-medium transition<%= typeof activePage !== 'undefined' && activePage === 'dashboard' ? ' !text-white' : '' %><%= typeof showDashboardLink !== 'undefined' && !showDashboardLink ? ' hidden' : '' %>">Dashboard</a>
+    
+    <% if (typeof requiresAuth === 'undefined' || !requiresAuth) { %>
+    <!-- Unauthenticated state (JS will toggle) -->
+    <a href="/auth/login" id="loginBtn" class="bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg font-medium transition">
+      Login with Discord
+    </a>
+    <% } %>
+    
+    <div id="userInfo" class="<%= typeof requiresAuth !== 'undefined' && requiresAuth ? 'flex' : 'hidden' %> items-center gap-3">
+      <img id="userAvatar" class="w-8 h-8 squircle" alt="">
+      <span id="userName" class="font-medium hidden lg:inline"></span>
+      <a href="/auth/logout" class="bg-zinc-800 hover:bg-zinc-700 px-4 py-2 rounded-lg font-medium transition">Logout</a>
+    </div>
+  </div>
+
+  <!-- Mobile Navigation -->
+  <div class="flex md:hidden items-center gap-2">
+    <% if (typeof requiresAuth === 'undefined' || !requiresAuth) { %>
+    <a href="/auth/login" id="loginBtnMobile" class="bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-lg text-sm font-medium transition">
+      Login
+    </a>
+    <% } %>
+    
+    <div id="userInfoMobile" class="<%= typeof requiresAuth !== 'undefined' && requiresAuth ? 'flex' : 'hidden' %> flex-row items-center gap-2">
+      <img id="userAvatarMobile" class="w-8 h-8 squircle flex-shrink-0" alt="">
+      <a href="/auth/logout" class="bg-zinc-800 hover:bg-zinc-700 px-3 py-1.5 rounded-lg text-sm font-medium transition whitespace-nowrap">Logout</a>
+    </div>
+  </div>
+</nav>

@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title: 'Dashboard' }) %>
+</head>
+<body class="bg-zinc-950 text-white min-h-screen">
+  <%- include('partials/background') %>
+  <%- include('partials/navbar', { requiresAuth: true, activePage: 'dashboard' }) %>
+
+  <main class="p-4 md:p-8 relative z-10">
+    <div class="max-w-6xl mx-auto">
+      <!-- Header -->
+      <div class="mb-6 md:mb-8">
+        <h1 class="text-2xl md:text-3xl font-bold mb-2">Select a Server</h1>
+        <p class="text-zinc-400 text-sm md:text-base">Choose a server to manage settings and auto-moderation.</p>
+      </div>
+
+      <!-- Stats Bar -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6 md:mb-8">
+        <div class="bg-zinc-900 p-4 md:p-5 rounded-xl border border-zinc-800 text-center">
+          <span id="totalGuilds" class="block text-xl md:text-2xl font-bold text-indigo-500">-</span>
+          <span class="text-xs md:text-sm text-zinc-400">Total Servers</span>
+        </div>
+        <div class="bg-zinc-900 p-4 md:p-5 rounded-xl border border-zinc-800 text-center">
+          <span id="totalUsers" class="block text-xl md:text-2xl font-bold text-indigo-500">-</span>
+          <span class="text-xs md:text-sm text-zinc-400">Total Users</span>
+        </div>
+        <div class="bg-zinc-900 p-4 md:p-5 rounded-xl border border-zinc-800 text-center">
+          <span id="botUptime" class="block text-xl md:text-2xl font-bold text-indigo-500">-</span>
+          <span class="text-xs md:text-sm text-zinc-400">Uptime</span>
+        </div>
+        <div class="bg-zinc-900 p-4 md:p-5 rounded-xl border border-zinc-800 text-center">
+          <span id="botPing" class="block text-xl md:text-2xl font-bold text-indigo-500">-</span>
+          <span class="text-xs md:text-sm text-zinc-400">Ping</span>
+        </div>
+      </div>
+
+      <!-- Guilds Grid -->
+      <div id="guildsContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
+        <div class="text-center py-12 text-zinc-400 col-span-full">Loading your servers...</div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    function formatUptime(ms) {
+      const seconds = Math.floor(ms / 1000);
+      const minutes = Math.floor(seconds / 60);
+      const hours = Math.floor(minutes / 60);
+      const days = Math.floor(hours / 24);
+      if (days > 0) return `${days}d ${hours % 24}h`;
+      if (hours > 0) return `${hours}h ${minutes % 60}m`;
+      return `${minutes}m ${seconds % 60}s`;
+    }
+
+    fetch('/api/stats')
+      .then(res => res.json())
+      .then(data => {
+        document.getElementById('totalGuilds').textContent = data.guilds;
+        document.getElementById('totalUsers').textContent = data.users.toLocaleString();
+        document.getElementById('botUptime').textContent = formatUptime(data.uptime);
+        document.getElementById('botPing').textContent = `${data.ping}ms`;
+      });
+
+    fetch('/api/guilds')
+      .then(res => res.json())
+      .then(guilds => {
+        const container = document.getElementById('guildsContainer');
+        
+        if (guilds.length === 0) {
+          container.innerHTML = `
+            <div class="col-span-full text-center py-12">
+              <h3 class="text-xl font-semibold mb-2">No servers found</h3>
+              <p class="text-gray-400 mb-4">You don't have any servers where you can manage ShaggyBot.</p>
+              <p class="text-gray-500 text-sm">Make sure ShaggyBot is in your server and you have Admin or Manage Server permissions.</p>
+            </div>
+          `;
+          return;
+        }
+
+        container.innerHTML = guilds.map(guild => {
+          const icon = guild.icon 
+            ? `https://cdn.discordapp.com/icons/${guild.id}/${guild.icon}.png`
+            : 'https://cdn.discordapp.com/embed/avatars/0.png';
+          
+          return `
+            <a href="/dashboard/${guild.id}" class="flex items-center gap-4 bg-zinc-900 p-5 rounded-xl border border-zinc-800 hover:border-indigo-500 transition group">
+              <img src="${icon}" alt="${guild.name}" class="w-12 h-12 rounded-full">
+              <div class="flex-1 min-w-0">
+                <h3 class="font-semibold truncate">${guild.name}</h3>
+                ${guild.owner ? '<span class="text-xs bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded">Owner</span>' : ''}
+              </div>
+              <span class="text-zinc-500 group-hover:text-white transition text-xl">→</span>
+            </a>
+          `;
+        }).join('');
+      })
+      .catch(err => {
+        document.getElementById('guildsContainer').innerHTML = `
+          <div class="col-span-full text-center py-12">
+            <h3 class="text-xl font-semibold text-red-400 mb-2">Failed to load servers</h3>
+            <p class="text-gray-400">Please try refreshing the page.</p>
+          </div>
+        `;
+      });
+  </script>
+  <%- include('partials/scripts/auth-check') %>
+</body>
+</html>

@@ -1,0 +1,52 @@
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<title><%= typeof title !== 'undefined' ? title + ' - ShaggyBot' : 'ShaggyBot Dashboard' %></title>
+<link rel="icon" type="image/png" href="/static/img/favicon.png">
+<link rel="apple-touch-icon" href="/static/img/favicon.png">
+<style>
+  /* Prevent white flash and FOUC on load */
+  html, body { 
+    background-color: #09090b; 
+    color: #fff;
+    font-family: 'Inter', sans-serif;
+  }
+  /* Hide main content on guild pages until authorized */
+  body.guild-page main { visibility: hidden; }
+  body.guild-page main.authorized { visibility: visible; }
+  /* Hide elements that should be hidden by default (before Tailwind loads) */
+  .hidden { display: none !important; }
+  /* Mobile menu button: hidden by default, shown by JS on sidebar pages */
+  /* Responsive visibility - match Tailwind breakpoints */
+  @media (min-width: 1024px) {
+    .lg\:hidden { display: none !important; }
+  }
+  @media (min-width: 768px) {
+    .md\:flex { display: flex !important; }
+    .md\:hidden { display: none !important; }
+  }
+  @media (max-width: 767px) {
+    .hidden.md\:flex { display: none !important; }
+  }
+  @media (max-width: 639px) {
+    .sm\:inline { display: none !important; }
+  }
+  @media (min-width: 640px) {
+    .sm\:inline { display: inline !important; }
+  }
+
+  .squircle {
+    width: 100px;
+    height: 100px;
+    background: transparent;
+    /* Use a squircle SVG as a mask */
+    mask-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><path d="M0 50C0 6.12 6.12 0 50 0s50 6.12 50 50-6.12 50-50 50S0 93.88 0 50z" fill="white"/></svg>');
+    mask-size: contain;
+    mask-repeat: no-repeat;
+  }
+</style>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<%- include('scripts/view-transitions') %>

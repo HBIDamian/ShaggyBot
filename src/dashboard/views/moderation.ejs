@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title: title }) %>
+</head>
+<body class="bg-zinc-950 text-white min-h-screen guild-page">
+  <%- include('partials/background') %>
+  <%- include('partials/navbar', { requiresAuth: true, activePage: 'dashboard' }) %>
+
+  <div class="flex min-h-[calc(100vh-65px)] relative z-10">
+    <%- include('partials/sidebar', { activeSection: 'moderation' }) %>
+
+    <!-- Main Content -->
+    <main class="flex-1 p-4 md:p-8 overflow-y-auto lg:ml-72">
+      <div class="max-w-3xl mx-auto">
+        <div class="mb-6 md:mb-8">
+          <h1 class="text-xl md:text-2xl font-bold mb-2">Moderation Settings</h1>
+          <p class="text-zinc-400 text-sm md:text-base">Configure moderation features for your server.</p>
+        </div>
+
+        <form id="moderationForm" class="space-y-6">
+          <!-- Report Button -->
+          <div class="bg-zinc-900 p-6 rounded-xl border border-zinc-800">
+            <div class="flex justify-between items-start mb-4">
+              <div>
+                <h3 class="font-semibold">🚨 Report Button</h3>
+                <p class="text-sm text-zinc-400">Allow users to report messages via Right Click → Apps → Report</p>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="report_enabled" class="sr-only peer">
+                <div class="w-14 h-7 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-indigo-600"></div>
+              </label>
+            </div>
+            <div id="reportSettings" class="pt-4 border-t border-zinc-800 hidden">
+              <div>
+                <label for="report_channel" class="block text-sm font-medium mb-2">Report Channel</label>
+                <select id="report_channel" name="report_channel"
+                        class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 focus:outline-none focus:border-indigo-500 transition">
+                  <option value="">Select a channel...</option>
+                </select>
+                <p class="text-xs text-zinc-500 mt-1.5">Channel where user reports will be sent</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Persistent Mute -->
+          <div class="bg-zinc-900 p-6 rounded-xl border border-zinc-800">
+            <div class="flex justify-between items-start mb-4">
+              <div>
+                <h3 class="font-semibold">🔇 Persistent Mute</h3>
+                <p class="text-sm text-zinc-400">Re-apply mute role if a muted user leaves and rejoins</p>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="persistent_mute_enabled" class="sr-only peer">
+                <div class="w-14 h-7 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-indigo-600"></div>
+              </label>
+            </div>
+            <div id="muteSettings" class="pt-4 border-t border-zinc-800 hidden">
+              <div>
+                <label for="mute_role" class="block text-sm font-medium mb-2">Mute Role</label>
+                <select id="mute_role" name="mute_role"
+                        class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 focus:outline-none focus:border-indigo-500 transition">
+                  <option value="">Select a role...</option>
+                </select>
+                <p class="text-xs text-zinc-500 mt-1.5">Role to apply when muting users</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Warning Thresholds -->
+          <div class="bg-zinc-900 p-6 rounded-xl border border-zinc-800">
+            <h3 class="font-semibold mb-4">⚠️ Warning Thresholds</h3>
+            <p class="text-sm text-zinc-400 mb-4">Automatically take action when users reach a certain number of warnings.</p>
+            
+            <div class="space-y-4">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label for="warn_mute_threshold" class="block text-sm font-medium mb-2">Auto-Mute at Warnings</label>
+                  <input type="number" id="warn_mute_threshold" min="0" max="20" value="3"
+                         class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500">
+                  <p class="text-xs text-zinc-500 mt-1">0 = disabled</p>
+                </div>
+                <div>
+                  <label for="warn_kick_threshold" class="block text-sm font-medium mb-2">Auto-Kick at Warnings</label>
+                  <input type="number" id="warn_kick_threshold" min="0" max="20" value="5"
+                         class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500">
+                  <p class="text-xs text-zinc-500 mt-1">0 = disabled</p>
+                </div>
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label for="warn_ban_threshold" class="block text-sm font-medium mb-2">Auto-Ban at Warnings</label>
+                  <input type="number" id="warn_ban_threshold" min="0" max="20" value="0"
+                         class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500">
+                  <p class="text-xs text-zinc-500 mt-1">0 = disabled</p>
+                </div>
+                <div>
+                  <label for="warn_expire_days" class="block text-sm font-medium mb-2">Warnings Expire After (Days)</label>
+                  <input type="number" id="warn_expire_days" min="0" max="365" value="30"
+                         class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500">
+                  <p class="text-xs text-zinc-500 mt-1">0 = never expire</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Punishment Notifications -->
+          <div class="bg-zinc-900 p-6 rounded-xl border border-zinc-800">
+            <h3 class="font-semibold mb-4">📢 Punishment Notifications</h3>
+            <p class="text-sm text-zinc-400 mb-4">Configure how users are notified when they receive a punishment.</p>
+            
+            <div class="space-y-4">
+              <!-- Event Toggles -->
+              <div>
+                <label class="block text-sm font-medium mb-3">Enabled Events</label>
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  <label class="flex items-center justify-between cursor-pointer p-2 rounded-lg bg-zinc-800/50 hover:bg-zinc-800 transition">
+                    <span class="text-sm">⚠️ Warns</span>
+                    <div class="relative inline-flex items-center">
+                      <input type="checkbox" id="notify_warn" class="sr-only peer">
+                      <div class="w-11 h-6 bg-zinc-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                    </div>
+                  </label>
+                  <label class="flex items-center justify-between cursor-pointer p-2 rounded-lg bg-zinc-800/50 hover:bg-zinc-800 transition">
+                    <span class="text-sm">👢 Kicks</span>
+                    <div class="relative inline-flex items-center">
+                      <input type="checkbox" id="notify_kick" class="sr-only peer">
+                      <div class="w-11 h-6 bg-zinc-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                    </div>
+                  </label>
+                  <label class="flex items-center justify-between cursor-pointer p-2 rounded-lg bg-zinc-800/50 hover:bg-zinc-800 transition">
+                    <span class="text-sm">🔨 Bans</span>
+                    <div class="relative inline-flex items-center">
+                      <input type="checkbox" id="notify_ban" class="sr-only peer">
+                      <div class="w-11 h-6 bg-zinc-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                    </div>
+                  </label>
+                  <label class="flex items-center justify-between cursor-pointer p-2 rounded-lg bg-zinc-800/50 hover:bg-zinc-800 transition">
+                    <span class="text-sm">🔓 Unbans</span>
+                    <div class="relative inline-flex items-center">
+                      <input type="checkbox" id="notify_unban" class="sr-only peer">
+                      <div class="w-11 h-6 bg-zinc-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                    </div>
+                  </label>
+                  <label class="flex items-center justify-between cursor-pointer p-2 rounded-lg bg-zinc-800/50 hover:bg-zinc-800 transition">
+                    <span class="text-sm">⏰ Timeouts</span>
+                    <div class="relative inline-flex items-center">
+                      <input type="checkbox" id="notify_timeout" class="sr-only peer">
+                      <div class="w-11 h-6 bg-zinc-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                    </div>
+                  </label>
+                  <label class="flex items-center justify-between cursor-pointer p-2 rounded-lg bg-zinc-800/50 hover:bg-zinc-800 transition">
+                    <span class="text-sm">🔇 Mutes</span>
+                    <div class="relative inline-flex items-center">
+                      <input type="checkbox" id="notify_mute" class="sr-only peer">
+                      <div class="w-11 h-6 bg-zinc-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                    </div>
+                  </label>
+                </div>
+                <p class="text-xs text-zinc-500 mt-2">Select which punishment types should trigger notifications</p>
+              </div>
+
+              <div class="pt-4 border-t border-zinc-800">
+                <label class="block text-sm font-medium mb-3">Notification Method</label>
+                <div class="space-y-2">
+                  <label class="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-zinc-800 transition">
+                    <div class="relative inline-flex items-center">
+                      <input type="radio" name="punishment_notify_mode" value="dm_only" class="sr-only peer">
+                      <div class="w-5 h-5 border-2 border-zinc-600 rounded-full peer-checked:border-indigo-500 peer-checked:bg-indigo-500 flex items-center justify-center transition-all">
+                        <div class="w-2 h-2 bg-white rounded-full opacity-0 peer-checked:opacity-100 transition-opacity"></div>
+                      </div>
+                    </div>
+                    <div>
+                      <span class="text-sm font-medium">DMs Only</span>
+                      <p class="text-xs text-zinc-500">Send punishment notifications only via direct message</p>
+                    </div>
+                  </label>
+                  <label class="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-zinc-800 transition">
+                    <div class="relative inline-flex items-center">
+                      <input type="radio" name="punishment_notify_mode" value="channel_only" class="sr-only peer">
+                      <div class="w-5 h-5 border-2 border-zinc-600 rounded-full peer-checked:border-indigo-500 peer-checked:bg-indigo-500 flex items-center justify-center transition-all">
+                        <div class="w-2 h-2 bg-white rounded-full opacity-0 peer-checked:opacity-100 transition-opacity"></div>
+                      </div>
+                    </div>
+                    <div>
+                      <span class="text-sm font-medium">Channel Only</span>
+                      <p class="text-xs text-zinc-500">Post punishment notifications only in a specific channel</p>
+                    </div>
+                  </label>
+                  <label class="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-zinc-800 transition">
+                    <div class="relative inline-flex items-center">
+                      <input type="radio" name="punishment_notify_mode" value="dm_and_channel" class="sr-only peer">
+                      <div class="w-5 h-5 border-2 border-zinc-600 rounded-full peer-checked:border-indigo-500 peer-checked:bg-indigo-500 flex items-center justify-center transition-all">
+                        <div class="w-2 h-2 bg-white rounded-full opacity-0 peer-checked:opacity-100 transition-opacity"></div>
+                      </div>
+                    </div>
+                    <div>
+                      <span class="text-sm font-medium">DMs and Channel</span>
+                      <p class="text-xs text-zinc-500">Send to both DMs and the punishment channel</p>
+                    </div>
+                  </label>
+                  <label class="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-zinc-800 transition">
+                    <div class="relative inline-flex items-center">
+                      <input type="radio" name="punishment_notify_mode" value="dm_first_then_channel" class="sr-only peer">
+                      <div class="w-5 h-5 border-2 border-zinc-600 rounded-full peer-checked:border-indigo-500 peer-checked:bg-indigo-500 flex items-center justify-center transition-all">
+                        <div class="w-2 h-2 bg-white rounded-full opacity-0 peer-checked:opacity-100 transition-opacity"></div>
+                      </div>
+                    </div>
+                    <div>
+                      <span class="text-sm font-medium">DMs First, Channel Fallback</span>
+                      <p class="text-xs text-zinc-500">Try DMs first, post to channel if user has DMs disabled</p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+              
+              <div id="punishmentChannelSettings" class="pt-4 border-t border-zinc-800 hidden">
+                <label for="punishment_channel" class="block text-sm font-medium mb-2">Punishment Notification Channel</label>
+                <select id="punishment_channel" name="punishment_channel"
+                        class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 focus:outline-none focus:border-indigo-500 transition">
+                  <option value="">Select a channel...</option>
+                </select>
+                <p class="text-xs text-zinc-500 mt-1.5">Channel where punishment notifications will be posted</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Actions - Desktop -->
+          <div class="hidden md:flex gap-4">
+            <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 px-6 py-2.5 rounded-lg font-medium transition">
+              Save Changes
+            </button>
+            <button type="button" onclick="loadSettings()" class="bg-zinc-800 hover:bg-zinc-700 px-6 py-2.5 rounded-lg font-medium transition">
+              Reset
+            </button>
+          </div>
+        </form>
+
+        <div id="saveStatus" class="mt-4 px-4 py-3 rounded-lg text-sm hidden"></div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Mobile Fixed Save Bar -->
+  <div class="fixed bottom-0 left-0 right-0 bg-zinc-900 border-t border-zinc-800 p-4 flex gap-3 md:hidden z-50">
+    <button type="button" onclick="document.getElementById('moderationForm').dispatchEvent(new Event('submit', {cancelable: true, bubbles: true}))" class="flex-1 bg-indigo-600 hover:bg-indigo-700 px-4 py-3 rounded-lg font-medium transition">
+      Save Changes
+    </button>
+    <button type="button" onclick="loadSettings()" class="bg-zinc-800 hover:bg-zinc-700 px-4 py-3 rounded-lg font-medium transition">
+      Reset
+    </button>
+  </div>
+  <div class="h-20 md:hidden"></div>
+
+  <script>
+    function onGuildReady(data) {
+      document.title = `Moderation - ${data.name} - ShaggyBot`;
+
+      const channelSelect = document.getElementById('report_channel');
+      const punishmentChannelSelect = document.getElementById('punishment_channel');
+      data.channels.forEach(channel => {
+        const option = document.createElement('option');
+        option.value = channel.id;
+        option.textContent = `#${channel.name}`;
+        channelSelect.appendChild(option);
+        
+        const option2 = option.cloneNode(true);
+        punishmentChannelSelect.appendChild(option2);
+      });
+
+      const roleSelect = document.getElementById('mute_role');
+      data.roles.forEach(role => {
+        const option = document.createElement('option');
+        option.value = role.id;
+        option.textContent = `@${role.name}`;
+        roleSelect.appendChild(option);
+      });
+
+      loadSettings();
+    }
+
+    function loadSettings() {
+      fetch(`/api/guilds/${guildId}/moderation`).then(res => res.json()).then(settings => {
+        document.getElementById('report_enabled').checked = settings.report_enabled;
+        document.getElementById('report_channel').value = settings.report_channel || '';
+        document.getElementById('persistent_mute_enabled').checked = settings.persistent_mute_enabled;
+        document.getElementById('mute_role').value = settings.mute_role || '';
+        document.getElementById('warn_mute_threshold').value = settings.warn_mute_threshold || 3;
+        document.getElementById('warn_kick_threshold').value = settings.warn_kick_threshold || 5;
+        document.getElementById('warn_ban_threshold').value = settings.warn_ban_threshold || 0;
+        document.getElementById('warn_expire_days').value = settings.warn_expire_days || 30;
+        
+        // Set punishment notification settings
+        const notifyMode = settings.punishment_notify_mode || 'dm_only';
+        const radioBtn = document.querySelector(`input[name="punishment_notify_mode"][value="${notifyMode}"]`);
+        if (radioBtn) radioBtn.checked = true;
+        document.getElementById('punishment_channel').value = settings.punishment_channel || '';
+        
+        // Set notification toggles (default to enabled)
+        document.getElementById('notify_warn').checked = settings.notify_warn !== 0;
+        document.getElementById('notify_kick').checked = settings.notify_kick !== 0;
+        document.getElementById('notify_ban').checked = settings.notify_ban !== 0;
+        document.getElementById('notify_unban').checked = settings.notify_unban !== 0;
+        document.getElementById('notify_timeout').checked = settings.notify_timeout !== 0;
+        document.getElementById('notify_mute').checked = settings.notify_mute !== 0;
+        
+        updateSubsettingsVisibility();
+      }).catch(() => {
+        // Set defaults on error
+        document.getElementById('notify_warn').checked = true;
+        document.getElementById('notify_kick').checked = true;
+        document.getElementById('notify_ban').checked = true;
+        document.getElementById('notify_unban').checked = true;
+        document.getElementById('notify_timeout').checked = true;
+        document.getElementById('notify_mute').checked = true;
+        updateSubsettingsVisibility();
+      });
+    }
+
+    function updateSubsettingsVisibility() {
+      document.getElementById('reportSettings').classList.toggle('hidden', !document.getElementById('report_enabled').checked);
+      document.getElementById('muteSettings').classList.toggle('hidden', !document.getElementById('persistent_mute_enabled').checked);
+      
+      // Show/hide punishment channel based on notification mode
+      const selectedMode = document.querySelector('input[name="punishment_notify_mode"]:checked')?.value || 'dm_only';
+      const showChannel = ['channel_only', 'dm_and_channel', 'dm_first_then_channel'].includes(selectedMode);
+      document.getElementById('punishmentChannelSettings').classList.toggle('hidden', !showChannel);
+    }
+
+    document.getElementById('report_enabled').addEventListener('change', updateSubsettingsVisibility);
+    document.getElementById('persistent_mute_enabled').addEventListener('change', updateSubsettingsVisibility);
+    
+    // Add event listeners for punishment notification radio buttons
+    document.querySelectorAll('input[name="punishment_notify_mode"]').forEach(radio => {
+      radio.addEventListener('change', updateSubsettingsVisibility);
+    });
+
+    document.getElementById('moderationForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const data = {
+        report_enabled: document.getElementById('report_enabled').checked ? 1 : 0,
+        report_channel: document.getElementById('report_channel').value,
+        persistent_mute_enabled: document.getElementById('persistent_mute_enabled').checked ? 1 : 0,
+        mute_role: document.getElementById('mute_role').value,
+        warn_mute_threshold: parseInt(document.getElementById('warn_mute_threshold').value),
+        warn_kick_threshold: parseInt(document.getElementById('warn_kick_threshold').value),
+        warn_ban_threshold: parseInt(document.getElementById('warn_ban_threshold').value),
+        warn_expire_days: parseInt(document.getElementById('warn_expire_days').value),
+        punishment_notify_mode: document.querySelector('input[name="punishment_notify_mode"]:checked')?.value || 'dm_only',
+        punishment_channel: document.getElementById('punishment_channel').value,
+        notify_warn: document.getElementById('notify_warn').checked ? 1 : 0,
+        notify_kick: document.getElementById('notify_kick').checked ? 1 : 0,
+        notify_ban: document.getElementById('notify_ban').checked ? 1 : 0,
+        notify_unban: document.getElementById('notify_unban').checked ? 1 : 0,
+        notify_timeout: document.getElementById('notify_timeout').checked ? 1 : 0,
+        notify_mute: document.getElementById('notify_mute').checked ? 1 : 0
+      };
+
+      const status = document.getElementById('saveStatus');
+      status.textContent = 'Saving...';
+      status.className = 'mt-4 px-4 py-3 rounded-lg text-sm bg-zinc-800 text-zinc-400';
+
+      try {
+        const res = await fetch(`/api/guilds/${guildId}/moderation`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        if (res.ok) {
+          status.textContent = '✓ Moderation settings saved successfully!';
+          status.className = 'mt-4 px-4 py-3 rounded-lg text-sm bg-green-500/20 text-green-400';
+        } else throw new Error('Failed');
+      } catch {
+        status.textContent = '✗ Failed to save settings. Please try again.';
+        status.className = 'mt-4 px-4 py-3 rounded-lg text-sm bg-red-500/20 text-red-400';
+      }
+      setTimeout(() => { status.className = 'mt-4 px-4 py-3 rounded-lg text-sm hidden'; }, 3000);
+    });
+  </script>
+  <%- include('partials/scripts/guild-loader') %>
+</body>
+</html>

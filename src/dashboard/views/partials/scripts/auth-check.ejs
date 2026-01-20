@@ -1,0 +1,42 @@
+<script>
+  // Check authentication and update navbar
+  fetch('/auth/me')
+    .then(res => res.json())
+    .then(data => {
+      if (data.user) {
+        const loginBtn = document.getElementById('loginBtn');
+        const loginBtnMobile = document.getElementById('loginBtnMobile');
+        const userInfo = document.getElementById('userInfo');
+        const userInfoMobile = document.getElementById('userInfoMobile');
+        const dashboardLink = document.getElementById('dashboardLink');
+        
+        if (loginBtn) loginBtn.classList.add('hidden');
+        if (loginBtnMobile) loginBtnMobile.classList.add('hidden');
+        if (userInfo) {
+          userInfo.classList.remove('hidden');
+          userInfo.classList.add('flex');
+        }
+        if (userInfoMobile) {
+          userInfoMobile.classList.remove('hidden');
+          userInfoMobile.classList.add('flex');
+        }
+        if (dashboardLink) dashboardLink.classList.remove('hidden');
+        
+        const avatar = data.user.avatar 
+          ? `https://cdn.discordapp.com/avatars/${data.user.id}/${data.user.avatar}.png`
+          : 'https://cdn.discordapp.com/embed/avatars/0.png';
+        
+        const userAvatar = document.getElementById('userAvatar');
+        const userAvatarMobile = document.getElementById('userAvatarMobile');
+        if (userAvatar) userAvatar.src = avatar;
+        if (userAvatarMobile) userAvatarMobile.src = avatar;
+        
+        const userName = document.getElementById('userName');
+        if (userName) userName.textContent = data.user.globalName || data.user.username;
+        
+        // Call onAuthReady if defined
+        if (typeof onAuthReady === 'function') onAuthReady(data.user);
+      }
+    })
+    .catch(() => {});
+</script>

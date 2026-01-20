@@ -1,0 +1,283 @@
+<script>
+/**
+ * Searchable Select Component
+ * Converts native selects into searchable dropdowns
+ */
+class SearchableSelect {
+  constructor(selectElement, options = {}) {
+    this.select = selectElement;
+    this.options = {
+      placeholder: options.placeholder || 'Select an option...',
+      searchPlaceholder: options.searchPlaceholder || 'Search...',
+      ...options
+    };
+    
+    this.selectedValue = '';
+    this.isOpen = false;
+    this.init();
+  }
+
+  init() {
+    // Hide original select
+    this.select.style.display = 'none';
+    
+    // Create wrapper
+    this.wrapper = document.createElement('div');
+    this.wrapper.className = 'searchable-select-wrapper relative';
+    this.select.parentNode.insertBefore(this.wrapper, this.select);
+    this.wrapper.appendChild(this.select);
+
+    // Create the visible container
+    this.container = document.createElement('div');
+    this.container.className = 'searchable-select-container bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 cursor-pointer flex items-center justify-between transition hover:border-zinc-600 focus-within:border-indigo-500';
+    this.wrapper.appendChild(this.container);
+
+    // Create display text
+    this.displayText = document.createElement('span');
+    this.displayText.className = 'text-zinc-300 text-sm truncate';
+    this.displayText.textContent = this.options.placeholder;
+    this.container.appendChild(this.displayText);
+
+    // Create dropdown arrow
+    this.arrow = document.createElement('div');
+    this.arrow.className = 'text-zinc-500 transition-transform flex-shrink-0 ml-2';
+    this.arrow.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>`;
+    this.container.appendChild(this.arrow);
+
+    // Create dropdown (append to body for proper positioning)
+    this.dropdown = document.createElement('div');
+    this.dropdown.className = 'searchable-select-dropdown fixed z-[9999] bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl max-h-72 overflow-hidden hidden';
+    document.body.appendChild(this.dropdown);
+
+    // Create search input inside dropdown
+    this.searchWrapper = document.createElement('div');
+    this.searchWrapper.className = 'sticky top-0 bg-zinc-800 p-2 border-b border-zinc-700';
+    this.dropdown.appendChild(this.searchWrapper);
+
+    this.searchInput = document.createElement('input');
+    this.searchInput.type = 'text';
+    this.searchInput.placeholder = this.options.searchPlaceholder;
+    this.searchInput.className = 'w-full bg-zinc-900 border border-zinc-600 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-indigo-500';
+    this.searchWrapper.appendChild(this.searchInput);
+
+    // Create options container
+    this.optionsContainer = document.createElement('div');
+    this.optionsContainer.className = 'overflow-y-auto max-h-56 p-1';
+    this.dropdown.appendChild(this.optionsContainer);
+
+    // Build options
+    this.buildOptions();
+
+    // Load initial selection
+    this.loadInitialSelection();
+
+    // Event listeners
+    this.container.addEventListener('click', () => this.toggleDropdown());
+
+    this.searchInput.addEventListener('input', () => this.filterOptions());
+    this.searchInput.addEventListener('click', (e) => e.stopPropagation());
+
+    // Close dropdown when clicking outside
+    this.documentClickHandler = (e) => {
+      if (!this.wrapper.contains(e.target) && !this.dropdown.contains(e.target)) {
+        this.closeDropdown();
+      }
+    };
+    document.addEventListener('click', this.documentClickHandler);
+
+    // Reposition on scroll/resize
+    this.repositionHandler = () => {
+      if (this.isOpen) {
+        this.positionDropdown();
+      }
+    };
+    window.addEventListener('scroll', this.repositionHandler, true);
+    window.addEventListener('resize', this.repositionHandler);
+
+    // Keyboard navigation
+    this.searchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        this.closeDropdown();
+      } else if (e.key === 'Enter') {
+        // Select first visible option
+        const firstVisible = this.optionsContainer.querySelector('.searchable-select-option:not([style*="display: none"])');
+        if (firstVisible) {
+          this.selectOption(firstVisible.dataset.value, firstVisible.dataset.text);
+        }
+      }
+    });
+  }
+
+  destroy() {
+    // Remove event listeners
+    if (this.documentClickHandler) {
+      document.removeEventListener('click', this.documentClickHandler);
+    }
+    if (this.repositionHandler) {
+      window.removeEventListener('scroll', this.repositionHandler, true);
+      window.removeEventListener('resize', this.repositionHandler);
+    }
+    
+    // Remove dropdown from body
+    if (this.dropdown && this.dropdown.parentNode) {
+      this.dropdown.remove();
+    }
+    
+    // Restore original select
+    if (this.select && this.wrapper) {
+      this.select.style.display = '';
+      this.select.searchableSelect = null;
+      if (this.wrapper.parentNode) {
+        this.wrapper.parentNode.insertBefore(this.select, this.wrapper);
+        this.wrapper.remove();
+      }
+    }
+  }
+
+  buildOptions() {
+    this.optionsContainer.innerHTML = '';
+    
+    Array.from(this.select.options).forEach((option) => {
+      const optionEl = document.createElement('div');
+      optionEl.className = 'searchable-select-option px-3 py-2 rounded cursor-pointer text-sm hover:bg-zinc-700 transition truncate';
+      optionEl.dataset.value = option.value;
+      optionEl.dataset.text = option.textContent;
+      optionEl.textContent = option.textContent;
+      
+      optionEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.selectOption(option.value, option.textContent);
+      });
+      
+      this.optionsContainer.appendChild(optionEl);
+    });
+  }
+
+  loadInitialSelection() {
+    if (this.select.value) {
+      const selectedOption = this.select.options[this.select.selectedIndex];
+      if (selectedOption) {
+        this.selectedValue = selectedOption.value;
+        this.displayText.textContent = selectedOption.textContent;
+        this.displayText.classList.remove('text-zinc-500');
+        this.displayText.classList.add('text-zinc-300');
+        this.updateOptionStates();
+      }
+    }
+  }
+
+  selectOption(value, text) {
+    this.selectedValue = value;
+    this.select.value = value;
+    this.displayText.textContent = text;
+    this.displayText.classList.remove('text-zinc-500');
+    this.displayText.classList.add('text-zinc-300');
+    this.updateOptionStates();
+    this.closeDropdown();
+    
+    // Dispatch change event
+    this.select.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  updateOptionStates() {
+    this.optionsContainer.querySelectorAll('.searchable-select-option').forEach(optionEl => {
+      if (optionEl.dataset.value === this.selectedValue) {
+        optionEl.classList.add('bg-indigo-600/30', 'text-indigo-300');
+      } else {
+        optionEl.classList.remove('bg-indigo-600/30', 'text-indigo-300');
+      }
+    });
+  }
+
+  filterOptions() {
+    const searchTerm = this.searchInput.value.toLowerCase();
+    
+    this.optionsContainer.querySelectorAll('.searchable-select-option').forEach(optionEl => {
+      const text = optionEl.dataset.text.toLowerCase();
+      if (text.includes(searchTerm)) {
+        optionEl.style.display = '';
+      } else {
+        optionEl.style.display = 'none';
+      }
+    });
+  }
+
+  toggleDropdown() {
+    if (this.isOpen) {
+      this.closeDropdown();
+    } else {
+      this.openDropdown();
+    }
+  }
+
+  openDropdown() {
+    this.isOpen = true;
+    this.dropdown.classList.remove('hidden');
+    this.positionDropdown();
+    this.arrow.classList.add('rotate-180');
+    this.container.classList.add('border-indigo-500');
+    this.searchInput.value = '';
+    this.filterOptions();
+    setTimeout(() => this.searchInput.focus(), 10);
+  }
+
+  positionDropdown() {
+    const rect = this.container.getBoundingClientRect();
+    const dropdownHeight = 288; // max-h-72 = 288px
+    const viewportHeight = window.innerHeight;
+    
+    const spaceBelow = viewportHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    
+    this.dropdown.style.width = `${rect.width}px`;
+    this.dropdown.style.left = `${rect.left}px`;
+    
+    if (spaceBelow >= dropdownHeight || spaceBelow >= spaceAbove) {
+      this.dropdown.style.top = `${rect.bottom + 4}px`;
+      this.dropdown.style.bottom = 'auto';
+    } else {
+      this.dropdown.style.top = 'auto';
+      this.dropdown.style.bottom = `${viewportHeight - rect.top + 4}px`;
+    }
+  }
+
+  closeDropdown() {
+    this.isOpen = false;
+    this.dropdown.classList.add('hidden');
+    this.arrow.classList.remove('rotate-180');
+    this.container.classList.remove('border-indigo-500');
+  }
+
+  // Public method to set value programmatically
+  setValue(value) {
+    const option = this.select.querySelector(`option[value="${value}"]`);
+    if (option) {
+      this.selectOption(value, option.textContent);
+    }
+  }
+
+  // Public method to get value
+  getValue() {
+    return this.selectedValue;
+  }
+
+  // Refresh options (e.g., after dynamically adding options)
+  refresh() {
+    this.buildOptions();
+    this.loadInitialSelection();
+  }
+}
+
+// Initialize searchable selects
+function initSearchableSelects() {
+  document.querySelectorAll('select[data-searchable]').forEach(select => {
+    if (select.searchableSelect) {
+      select.searchableSelect.refresh();
+    } else {
+      const placeholder = select.dataset.placeholder || 'Select an option...';
+      const searchPlaceholder = select.dataset.searchPlaceholder || 'Search...';
+      select.searchableSelect = new SearchableSelect(select, { placeholder, searchPlaceholder });
+    }
+  });
+}
+</script>

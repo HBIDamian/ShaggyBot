@@ -1,0 +1,76 @@
+<script>
+  const guildId = window.location.pathname.split('/')[2];
+  const basePath = `/dashboard/${guildId}`;
+  let guildData = null;
+  let guildSettings = null;
+  let serverTimezone = 'UTC';
+
+  function navigateTo(path) {
+    window.location.href = basePath + path;
+  }
+
+  // Format date with server timezone
+  function formatDateWithTimezone(dateString) {
+    try {
+      return new Date(dateString).toLocaleString('en-US', { timeZone: serverTimezone });
+    } catch (e) {
+      return new Date(dateString).toLocaleString();
+    }
+  }
+
+  // Load user info
+  fetch('/auth/me').then(res => res.json()).then(data => {
+    if (data.user) {
+      const avatar = data.user.avatar 
+        ? `https://cdn.discordapp.com/avatars/${data.user.id}/${data.user.avatar}.png`
+        : 'https://cdn.discordapp.com/embed/avatars/0.png';
+      
+      const userAvatar = document.getElementById('userAvatar');
+      const userAvatarMobile = document.getElementById('userAvatarMobile');
+      if (userAvatar) userAvatar.src = avatar;
+      if (userAvatarMobile) userAvatarMobile.src = avatar;
+      
+      const userName = document.getElementById('userName');
+      if (userName) userName.textContent = data.user.globalName || data.user.username;
+    }
+  });
+
+  // Load guild info and settings
+  Promise.all([
+    fetch(`/api/guilds/${guildId}`).then(res => {
+      if (!res.ok) {
+        return res.json().then(data => {
+          throw { status: res.status, message: data.error || 'Failed to load server data' };
+        });
+      }
+      return res.json();
+    }),
+    fetch(`/api/guilds/${guildId}/settings`).then(res => {
+      if (!res.ok) {
+        return res.json().then(data => {
+          throw { status: res.status, message: data.error || 'Failed to load settings' };
+        });
+      }
+      return res.json();
+    })
+  ]).then(([data, settings]) => {
+    guildData = data;
+    guildSettings = settings;
+    serverTimezone = settings.server_timezone || 'UTC';
+    
+    document.getElementById('guildIcon').src = data.icon || 'https://cdn.discordapp.com/embed/avatars/0.png';
+    document.getElementById('guildName').textContent = data.name;
+    document.getElementById('guildMemberCount').textContent = `${data.memberCount.toLocaleString()} members`;
+    
+    // Show content - user is authorized
+    document.querySelector('main').classList.add('authorized');
+    
+    // Call onGuildReady if defined
+    if (typeof onGuildReady === 'function') onGuildReady(data);
+  }).catch((err) => {
+    // Redirect to error page
+    const status = err.status || 500;
+    const message = encodeURIComponent(err.message || 'Failed to load server data');
+    window.location.href = `/error?code=${status}&message=${message}`;
+  });
+</script>
