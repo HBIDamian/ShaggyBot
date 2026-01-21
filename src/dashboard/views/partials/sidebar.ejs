@@ -23,6 +23,9 @@
       <a href="#" onclick="navigateTo(''); return false;" class="sidebar-link flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition <%= typeof activeSection !== 'undefined' && activeSection === 'settings' ? 'bg-indigo-600 text-white font-medium' : 'text-zinc-400 hover:bg-zinc-800 hover:text-white' %>">
         <span>⚙️</span> Bot Settings
       </a>
+      <a href="#" onclick="navigateTo('/commandtoggles'); return false;" class="sidebar-link flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition <%= typeof activeSection !== 'undefined' && activeSection === 'commandtoggles' ? 'bg-indigo-600 text-white font-medium' : 'text-zinc-400 hover:bg-zinc-800 hover:text-white' %>">
+        <span>🎚️</span> Command Toggles
+      </a>
     </nav>
   </div>
 

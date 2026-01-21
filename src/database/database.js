@@ -693,6 +693,17 @@ function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_reminders_remind_at ON reminders(remind_at);
   `);
 
+  // Command toggle settings table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS command_toggle_settings (
+      guild_id TEXT PRIMARY KEY,
+      admins_bypass INTEGER DEFAULT 1,
+      mods_bypass INTEGER DEFAULT 1,
+      disabled_commands TEXT DEFAULT '[]',
+      FOREIGN KEY (guild_id) REFERENCES guild_settings(guild_id) ON DELETE CASCADE
+    )
+  `);
+
   logger.info('Database initialized successfully');
 }
 
@@ -1909,6 +1920,52 @@ function deleteReminderById(id) {
   return result.changes > 0;
 }
 
+/**
+ * Get command toggle settings for a guild
+ * @param {string} guildId - The guild ID
+ * @returns {Object} Command toggle settings
+ */
+function getCommandToggleSettings(guildId) {
+  // Ensure guild settings exist first
+  getGuildSettings(guildId);
+  
+  let settings = db.prepare('SELECT * FROM command_toggle_settings WHERE guild_id = ?').get(guildId);
+  
+  if (!settings) {
+    db.prepare('INSERT INTO command_toggle_settings (guild_id) VALUES (?)').run(guildId);
+    settings = db.prepare('SELECT * FROM command_toggle_settings WHERE guild_id = ?').get(guildId);
+  }
+  
+  // Parse JSON fields
+  settings.disabled_commands = JSON.parse(settings.disabled_commands || '[]');
+  
+  return settings;
+}
+
+/**
+ * Update command toggle settings
+ * @param {string} guildId - The guild ID
+ * @param {Object} updates - Object with fields to update
+ * @returns {Object} Result with success and skippedFields
+ */
+function updateCommandToggleSettings(guildId, updates) {
+  const allowedFields = ['admins_bypass', 'mods_bypass', 'disabled_commands'];
+  const jsonFields = ['disabled_commands'];
+  
+  return updateTable('command_toggle_settings', 'guild_id', guildId, updates, allowedFields, jsonFields);
+}
+
+/**
+ * Check if a command is disabled for a guild
+ * @param {string} guildId - The guild ID
+ * @param {string} commandName - The command name
+ * @returns {boolean} True if command is disabled
+ */
+function isCommandDisabled(guildId, commandName) {
+  const settings = getCommandToggleSettings(guildId);
+  return settings.disabled_commands.includes(commandName);
+}
+
 // Initialize on require
 initDatabase();
 
@@ -1985,5 +2042,9 @@ module.exports = {
   getUserReminders,
   deleteReminder,
   getDueReminders,
-  deleteReminderById
+  deleteReminderById,
+  // Command Toggles
+  getCommandToggleSettings,
+  updateCommandToggleSettings,
+  isCommandDisabled
 };

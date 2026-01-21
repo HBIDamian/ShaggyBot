@@ -4,6 +4,45 @@ const db = require('../database/database');
 
 const logger = createLogger('InteractionHandler');
 
+// Categories containing public (non-moderation) commands
+const PUBLIC_COMMAND_CATEGORIES = ['fun', 'utility', 'features'];
+
+/**
+ * Check if a command is disabled and if the user can bypass it
+ * @param {Object} interaction - Discord interaction
+ * @param {string} commandName - Name of the command
+ * @returns {boolean} True if command should be blocked
+ */
+function checkCommandDisabled(interaction, commandName) {
+  try {
+    const settings = db.getCommandToggleSettings(interaction.guildId);
+    
+    // Check if command is in the disabled list
+    if (!settings.disabled_commands.includes(commandName)) {
+      return false; // Command is not disabled
+    }
+    
+    // Command is disabled, check for bypasses
+    const member = interaction.member;
+    
+    // Check admin bypass
+    if (settings.admins_bypass && member.permissions.has(PermissionFlagsBits.Administrator)) {
+      return false; // Admin can bypass
+    }
+    
+    // Check mod bypass (Manage Messages permission)
+    if (settings.mods_bypass && member.permissions.has(PermissionFlagsBits.ManageMessages)) {
+      return false; // Mod can bypass
+    }
+    
+    // Command is disabled and user cannot bypass
+    return true;
+  } catch (err) {
+    logger.error(`Error checking command toggle: ${err.message}`);
+    return false; // On error, allow the command
+  }
+}
+
 module.exports = {
   name: Events.InteractionCreate,
   async execute(interaction, client) {
@@ -46,6 +85,17 @@ async function handleSlashCommand(interaction, client) {
         content: 'There was an error while executing this command!', 
         flags: MessageFlags.Ephemeral 
       });
+    }
+    
+    // Check if command is disabled for this guild (only for guild commands)
+    if (interaction.guildId) {
+      const commandDisabled = checkCommandDisabled(interaction, command.data.name);
+      if (commandDisabled) {
+        return interaction.reply({
+          content: '❌ This command has been disabled by the server administrators.',
+          flags: MessageFlags.Ephemeral
+        });
+      }
     }
     
     // Implement command cooldowns

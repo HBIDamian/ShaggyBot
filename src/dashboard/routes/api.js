@@ -172,6 +172,7 @@ createSettingsRoutes('/moderation', db.getModerationSettings.bind(db), db.update
 createSettingsRoutes('/auditlog', db.getAuditLogSettings.bind(db), db.updateAuditLogSettings.bind(db), 'audit log');
 createSettingsRoutes('/starboard', db.getStarboardSettings.bind(db), db.updateStarboardSettings.bind(db), 'starboard');
 createSettingsRoutes('/antiraid', db.getAntiRaidSettings.bind(db), db.updateAntiRaidSettings.bind(db), 'anti-raid');
+createSettingsRoutes('/commandtoggles', db.getCommandToggleSettings.bind(db), db.updateCommandToggleSettings.bind(db), 'command toggles');
 
 /**
  * Get mod actions for a guild

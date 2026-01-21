@@ -21,6 +21,7 @@ const GUILD_PAGE_DEFAULTS = {
 // Guild page routes configuration
 const GUILD_PAGES = [
   { path: '', view: 'guild', title: 'Bot Settings', section: 'settings' },
+  { path: '/commandtoggles', view: 'commandtoggles', title: 'Command Toggles', section: 'commandtoggles' },
   { path: '/automod', view: 'automod', title: 'Auto-Moderation', section: 'automod' },
   { path: '/logs', view: 'logs', title: 'Audit Log', section: 'logs' },
   { path: '/moderation', view: 'moderation', title: 'Moderation', section: 'moderation' },

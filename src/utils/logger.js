@@ -105,7 +105,7 @@ function createLogger(moduleName) {
     
     const timestamp = new Date().toISOString();
     const errorStr = error ? '\n' + util.format(error) : '';
-    const logLine = `${timestamp} [${level.toUpperCase().padEnd(5)}] [${moduleName}] ${message}${errorStr}`;
+    const logLine = `${timestamp} [${level.toUpperCase()}] [${moduleName}] ${message}${errorStr}`;
 
     // Write to console with color
     const color = COLORS[level] || '';
