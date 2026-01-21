@@ -17,7 +17,7 @@ module.exports = {
       option.setName('silent')
         .setDescription('Don\'t announce the unwarn in the channel')
         .setRequired(false))
-    .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
 
   async execute(interaction) {
     const warningId = interaction.options.getInteger('id');

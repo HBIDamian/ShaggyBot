@@ -24,7 +24,7 @@ module.exports = {
       option.setName('silent')
         .setDescription('Don\'t announce the mute in the channel')
         .setRequired(false))
-    .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
 
   async execute(interaction) {
     const user = interaction.options.getUser('user');

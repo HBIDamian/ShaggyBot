@@ -87,7 +87,7 @@ module.exports = {
       option.setName('user')
         .setDescription('The user to check warnings for')
         .setRequired(true))
-    .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
 
   async execute(interaction) {
     const user = interaction.options.getUser('user');

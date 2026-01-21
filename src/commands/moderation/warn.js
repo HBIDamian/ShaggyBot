@@ -26,7 +26,7 @@ module.exports = {
       option.setName('anonymous')
         .setDescription('Hide your name from the warned user')
         .setRequired(false))
-    .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
 
   async execute(interaction) {
     const user = interaction.options.getUser('user');

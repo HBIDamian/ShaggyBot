@@ -13,7 +13,7 @@ module.exports = {
       option.setName('user')
         .setDescription('The user to unmute')
         .setRequired(true))
-    .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
 
   async execute(interaction) {
     const user = interaction.options.getUser('user');
