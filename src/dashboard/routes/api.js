@@ -698,4 +698,143 @@ router.post('/guilds/:guildId/lockdown/end', requireAuth, requireGuildPermission
   }
 });
 
+/**
+ * Get all bot commands with metadata
+ */
+router.get('/commands', (req, res) => {
+  const client = req.app.get('client');
+  const fs = require('fs');
+  const path = require('path');
+  const { PermissionFlagsBits } = require('discord.js');
+  
+  // Permission flag names for display
+  const permissionNames = {
+    [String(PermissionFlagsBits.Administrator)]: 'Administrator',
+    [String(PermissionFlagsBits.ManageGuild)]: 'Manage Server',
+    [String(PermissionFlagsBits.ManageRoles)]: 'Manage Roles',
+    [String(PermissionFlagsBits.ManageChannels)]: 'Manage Channels',
+    [String(PermissionFlagsBits.KickMembers)]: 'Kick Members',
+    [String(PermissionFlagsBits.BanMembers)]: 'Ban Members',
+    [String(PermissionFlagsBits.ManageMessages)]: 'Manage Messages',
+    [String(PermissionFlagsBits.ModerateMembers)]: 'Timeout Members',
+    [String(PermissionFlagsBits.ManageNicknames)]: 'Manage Nicknames',
+    [String(PermissionFlagsBits.ManageWebhooks)]: 'Manage Webhooks',
+    [String(PermissionFlagsBits.ManageEmojisAndStickers)]: 'Manage Emojis',
+    [String(PermissionFlagsBits.ViewAuditLog)]: 'View Audit Log',
+    [String(PermissionFlagsBits.MuteMembers)]: 'Mute Members',
+    [String(PermissionFlagsBits.DeafenMembers)]: 'Deafen Members',
+    [String(PermissionFlagsBits.MoveMembers)]: 'Move Members',
+    [String(PermissionFlagsBits.SendMessages)]: 'Send Messages',
+  };
+  
+  /**
+   * Get permission names from permission bitfield
+   */
+  function getPermissionNames(permissionBitfield) {
+    if (!permissionBitfield) return [];
+    const permissions = [];
+    const permBigInt = BigInt(permissionBitfield);
+    
+    for (const [bit, name] of Object.entries(permissionNames)) {
+      if ((permBigInt & BigInt(bit)) === BigInt(bit)) {
+        permissions.push(name);
+      }
+    }
+    return permissions;
+  }
+  
+  /**
+   * Extract option info from SlashCommandBuilder option
+   */
+  function extractOptionInfo(option) {
+    const optionTypeMap = {
+      3: 'string',
+      4: 'integer',
+      5: 'boolean',
+      6: 'user',
+      7: 'channel',
+      8: 'role',
+      9: 'mentionable',
+      10: 'number',
+      11: 'attachment'
+    };
+    
+    return {
+      name: option.name,
+      description: option.description,
+      type: optionTypeMap[option.type] || 'unknown',
+      required: option.required || false,
+      choices: option.choices?.map(c => c.name) || null
+    };
+  }
+  
+  /**
+   * Extract subcommand info
+   */
+  function extractSubcommandInfo(subcommand) {
+    return {
+      name: subcommand.name,
+      description: subcommand.description,
+      options: subcommand.options?.map(extractOptionInfo) || []
+    };
+  }
+  
+  const commandsPath = path.join(__dirname, '../../commands');
+  const categories = fs.readdirSync(commandsPath, { withFileTypes: true })
+    .filter(d => d.isDirectory())
+    .map(d => d.name);
+  
+  const commandsByCategory = {};
+  
+  for (const category of categories) {
+    const commands = [];
+    const categoryPath = path.join(commandsPath, category);
+    const files = fs.readdirSync(categoryPath).filter(f => f.endsWith('.js'));
+    
+    for (const file of files) {
+      try {
+        // Clear require cache to get fresh data
+        const filePath = path.join(categoryPath, file);
+        delete require.cache[require.resolve(filePath)];
+        const command = require(filePath);
+        
+        if (command.data) {
+          const data = command.data;
+          const json = data.toJSON ? data.toJSON() : data;
+          
+          // Extract subcommands if any
+          const subcommands = json.options?.filter(opt => opt.type === 1).map(extractSubcommandInfo) || [];
+          const subcommandGroups = json.options?.filter(opt => opt.type === 2).map(group => ({
+            name: group.name,
+            description: group.description,
+            subcommands: group.options?.map(extractSubcommandInfo) || []
+          })) || [];
+          
+          // Extract regular options (not subcommands)
+          const options = json.options?.filter(opt => opt.type > 2).map(extractOptionInfo) || [];
+          
+          commands.push({
+            name: json.name,
+            description: json.description,
+            permissions: getPermissionNames(json.default_member_permissions),
+            options,
+            subcommands,
+            subcommandGroups
+          });
+        }
+      } catch (err) {
+        logger.error(`Error loading command ${file} for API: ${err.message}`);
+      }
+    }
+    
+    if (commands.length > 0) {
+      // Sort commands alphabetically
+      commands.sort((a, b) => a.name.localeCompare(b.name));
+      commandsByCategory[category] = commands;
+    }
+  }
+  
+  res.json(commandsByCategory);
+});
+
 module.exports = router;

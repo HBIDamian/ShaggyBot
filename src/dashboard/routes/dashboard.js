@@ -40,6 +40,13 @@ router.get('/', (req, res) => {
 });
 
 /**
+ * Commands page - public, no auth required
+ */
+router.get('/commands', (req, res) => {
+  res.render('commands', { activePage: 'commands' });
+});
+
+/**
  * Dashboard - guild selection
  */
 router.get('/dashboard', requireAuth, (req, res) => {
