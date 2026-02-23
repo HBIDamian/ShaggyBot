@@ -1,4 +1,4 @@
-const sqlite3 = require('better-sqlite3');
+const { Database } = require('bun:sqlite');
 const path = require('path');
 const fs = require('fs');
 const { createLogger } = require('../utils/logger');
@@ -12,11 +12,11 @@ if (!fs.existsSync(dataDir)) {
 }
 
 const dbPath = path.join(dataDir, 'shaggybot.db');
-const db = sqlite3(dbPath);
+const db = new Database(dbPath);
 
 // Enable foreign keys and WAL mode for better performance
-db.pragma('foreign_keys = ON');
-db.pragma('journal_mode = WAL');
+db.exec('PRAGMA foreign_keys = ON');
+db.exec('PRAGMA journal_mode = WAL');
 
 // Prepared statement cache
 const stmtCache = new Map();

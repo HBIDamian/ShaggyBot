@@ -1,7 +1,6 @@
 const express = require('express');
 const session = require('express-session');
-const SqliteStore = require('better-sqlite3-session-store')(session);
-const Database = require('better-sqlite3');
+const { Database } = require('bun:sqlite');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
@@ -23,6 +22,75 @@ if (!fs.existsSync(DATA_DIR)) {
 }
 
 const sessionDb = new Database(SESSION_DB_PATH);
+
+// Initialize session table for bun:sqlite (replaces better-sqlite3-session-store)
+sessionDb.run(`
+  CREATE TABLE IF NOT EXISTS sessions (
+    sid TEXT PRIMARY KEY,
+    sess TEXT NOT NULL,
+    expire INTEGER NOT NULL
+  )
+`);
+sessionDb.run('CREATE INDEX IF NOT EXISTS sessions_expire_idx ON sessions(expire)');
+
+// Custom session store for bun:sqlite
+class BunSqliteStore extends session.Store {
+  constructor(options = {}) {
+    super();
+    this.db = options.client;
+    this.cleanupInterval = options.expired?.intervalMs || SESSION_CLEANUP_INTERVAL_MS;
+    if (options.expired?.clear !== false) {
+      this._startCleanup();
+    }
+  }
+
+  _startCleanup() {
+    this._cleanupTimer = setInterval(() => {
+      this.db.run('DELETE FROM sessions WHERE expire < ?', [Date.now()]);
+    }, this.cleanupInterval);
+    this._cleanupTimer.unref?.();
+  }
+
+  get(sid, callback) {
+    try {
+      const row = this.db.query('SELECT sess FROM sessions WHERE sid = ? AND expire > ?').get(sid, Date.now());
+      if (row) {
+        callback(null, JSON.parse(row.sess));
+      } else {
+        callback(null, null);
+      }
+    } catch (err) {
+      callback(err);
+    }
+  }
+
+  set(sid, sess, callback) {
+    try {
+      const maxAge = sess.cookie?.maxAge || SESSION_MAX_AGE_MS;
+      const expire = Date.now() + maxAge;
+      this.db.run(
+        'INSERT OR REPLACE INTO sessions (sid, sess, expire) VALUES (?, ?, ?)',
+        [sid, JSON.stringify(sess), expire]
+      );
+      callback?.(null);
+    } catch (err) {
+      callback?.(err);
+    }
+  }
+
+  destroy(sid, callback) {
+    try {
+      this.db.run('DELETE FROM sessions WHERE sid = ?', [sid]);
+      callback?.(null);
+    } catch (err) {
+      callback?.(err);
+    }
+  }
+
+  touch(sid, sess, callback) {
+    this.set(sid, sess, callback);
+  }
+}
 
 /**
  * Get or generate session secret
@@ -56,7 +124,7 @@ function createDashboard(client) {
   
   // Session configuration with SQLite store
   app.use(session({
-    store: new SqliteStore({
+    store: new BunSqliteStore({
       client: sessionDb,
       expired: { clear: true, intervalMs: SESSION_CLEANUP_INTERVAL_MS }
     }),

@@ -4,9 +4,9 @@
   "description": "ShaggyBot - A Discord bot with fun and moderation commands, and a web dashboard for easy management.",
   "main": "src/index.js",
   "scripts": {
-    "start": "node src/index.js",
-    "dev": "nodemon src/index.js",
-    "deploy": "node src/deploy-commands.js",
+    "start": "bun src/index.js",
+    "dev": "bun --watch src/index.js",
+    "deploy": "bun src/deploy-commands.js",
     "lint": "eslint src/",
     "test": "echo \"No tests configured\" && exit 0"
   },
@@ -23,8 +23,6 @@
   },
   "dependencies": {
     "axios": "^1.9.0",
-    "better-sqlite3": "^11.0.0",
-    "better-sqlite3-session-store": "^0.1.0",
     "discord.js": "^14.25.1",
     "dotenv": "^16.5.0",
     "ejs": "^3.1.10",
@@ -32,7 +30,6 @@
     "express-session": "^1.18.0"
   },
   "devDependencies": {
-    "nodemon": "^3.1.10"
   },
   "overrides": {
     "undici": "^7.18.2"
