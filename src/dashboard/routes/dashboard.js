@@ -30,7 +30,8 @@ const GUILD_PAGES = [
   { path: '/trolldiscourager', view: 'trolldiscourager', title: 'Troll Discourager', section: 'trolldiscourager' },
   { path: '/starboard', view: 'starboard', title: 'Starboard', section: 'starboard' },
   { path: '/antiraid', view: 'antiraid', title: 'Anti-Raid', section: 'antiraid' },
-  { path: '/lockdown', view: 'lockdown', title: 'Lockdown', section: 'lockdown' }
+  { path: '/lockdown', view: 'lockdown', title: 'Lockdown', section: 'lockdown' },
+  { path: '/honeypot', view: 'honeypot', title: 'Honeypot', section: 'honeypot' }
 ];
 
 /**

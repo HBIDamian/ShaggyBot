@@ -22,15 +22,14 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "axios": "^1.9.0",
+    "axios": "^1.13.5",
     "discord.js": "^14.25.1",
-    "dotenv": "^16.5.0",
+    "dotenv": "^16.6.1",
     "ejs": "^3.1.10",
-    "express": "^4.21.0",
-    "express-session": "^1.18.0"
+    "express": "^4.22.1",
+    "express-session": "^1.19.0"
   },
-  "devDependencies": {
-  },
+  "devDependencies": {},
   "overrides": {
     "undici": "^7.18.2"
   }

@@ -45,6 +45,9 @@
       <a href="#" onclick="navigateTo('/lockdown'); return false;" class="sidebar-link flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition <%= typeof activeSection !== 'undefined' && activeSection === 'lockdown' ? 'bg-indigo-600 text-white font-medium' : 'text-zinc-400 hover:bg-zinc-800 hover:text-white' %>">
         <span>🔒</span> Lockdown
       </a>
+      <a href="#" onclick="navigateTo('/honeypot'); return false;" class="sidebar-link flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition <%= typeof activeSection !== 'undefined' && activeSection === 'honeypot' ? 'bg-indigo-600 text-white font-medium' : 'text-zinc-400 hover:bg-zinc-800 hover:text-white' %>">
+        <span>🍯</span> Honeypot
+      </a>
       <a href="#" onclick="navigateTo('/logs'); return false;" class="sidebar-link flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition <%= typeof activeSection !== 'undefined' && activeSection === 'logs' ? 'bg-indigo-600 text-white font-medium' : 'text-zinc-400 hover:bg-zinc-800 hover:text-white' %>">
         <span>📜</span> Logs
       </a>

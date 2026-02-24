@@ -680,6 +680,49 @@ function initDatabase() {
     )
   `);
 
+  // Honeypot settings table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS honeypot_settings (
+      guild_id TEXT PRIMARY KEY,
+      enabled INTEGER DEFAULT 0,
+      honeypot_channel_id TEXT,
+      log_channel_id TEXT,
+      action TEXT DEFAULT 'softban',
+      dm_user INTEGER DEFAULT 1,
+      delete_messages INTEGER DEFAULT 1,
+      embed_title TEXT DEFAULT 'DO NOT SEND MESSAGES IN THIS CHANNEL',
+      embed_description TEXT DEFAULT 'This channel is used to catch spam bots. Any messages sent here will result in automatic moderation action.',
+      embed_image TEXT,
+      embed_message_id TEXT,
+      dm_embed_title TEXT DEFAULT '🍯 Honeypot Triggered',
+      dm_embed_description TEXT DEFAULT 'You have been {action} from **{server}** for sending a message in a honeypot channel.',
+      dm_embed_footer TEXT DEFAULT 'If you believe this was a mistake, please contact the server administrators.',
+      FOREIGN KEY (guild_id) REFERENCES guild_settings(guild_id) ON DELETE CASCADE
+    )
+  `);
+
+  // Migration for honeypot_settings - add embed and keep_channel_empty columns
+  try {
+    const honeypotColumns = db.prepare('PRAGMA table_info(honeypot_settings)').all().map(c => c.name);
+    const honeypotNewCols = [
+      { name: 'embed_title', type: "TEXT DEFAULT 'DO NOT SEND MESSAGES IN THIS CHANNEL'" },
+      { name: 'embed_description', type: "TEXT DEFAULT 'This channel is used to catch spam bots. Any messages sent here will result in automatic moderation action.'" },
+      { name: 'embed_image', type: 'TEXT' },
+      { name: 'embed_message_id', type: 'TEXT' },
+      { name: 'keep_channel_empty', type: 'INTEGER DEFAULT 1' },
+      { name: 'dm_embed_title', type: "TEXT DEFAULT '\uD83C\uDF6F Honeypot Triggered'" },
+      { name: 'dm_embed_description', type: "TEXT DEFAULT 'You have been {action} from **{server}** for sending a message in a honeypot channel.'" },
+      { name: 'dm_embed_footer', type: "TEXT DEFAULT 'If you believe this was a mistake, please contact the server administrators.'" }
+    ];
+    for (const col of honeypotNewCols) {
+      if (!honeypotColumns.includes(col.name)) {
+        db.exec(`ALTER TABLE honeypot_settings ADD COLUMN ${col.name} ${col.type}`);
+      }
+    }
+  } catch (e) {
+    // Columns already exist or other non-critical error
+  }
+
   // Create indexes
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_mod_actions_guild ON mod_actions(guild_id);
@@ -1966,6 +2009,60 @@ function isCommandDisabled(guildId, commandName) {
   return settings.disabled_commands.includes(commandName);
 }
 
+// ==================== HONEYPOT ====================
+
+/**
+ * Get honeypot settings for a guild
+ * @param {string} guildId - The guild ID
+ * @returns {Object} Honeypot settings
+ */
+function getHoneypotSettings(guildId) {
+  getGuildSettings(guildId);
+  
+  let settings = db.prepare('SELECT * FROM honeypot_settings WHERE guild_id = ?').get(guildId);
+  
+  if (!settings) {
+    db.prepare('INSERT INTO honeypot_settings (guild_id) VALUES (?)').run(guildId);
+    settings = db.prepare('SELECT * FROM honeypot_settings WHERE guild_id = ?').get(guildId);
+  }
+  
+  return settings;
+}
+
+/**
+ * Update honeypot settings
+ * @param {string} guildId - The guild ID
+ * @param {Object} updates - Object with fields to update
+ * @returns {Object} Result with success and skippedFields
+ */
+function updateHoneypotSettings(guildId, updates) {
+  const allowedFields = [
+    'enabled', 'honeypot_channel_id', 'log_channel_id',
+    'action', 'dm_user', 'delete_messages', 'keep_channel_empty',
+    'embed_title', 'embed_description', 'embed_image', 'embed_message_id',
+    'dm_embed_title', 'dm_embed_description', 'dm_embed_footer'
+  ];
+  
+  getHoneypotSettings(guildId);
+  
+  const fields = [];
+  const values = [];
+  
+  for (const [key, value] of Object.entries(updates)) {
+    if (allowedFields.includes(key)) {
+      fields.push(`${key} = ?`);
+      values.push(value);
+    }
+  }
+  
+  if (fields.length === 0) return { success: false };
+  
+  values.push(guildId);
+  db.prepare(`UPDATE honeypot_settings SET ${fields.join(', ')} WHERE guild_id = ?`).run(...values);
+  
+  return { success: true };
+}
+
 // Initialize on require
 initDatabase();
 
@@ -2046,5 +2143,8 @@ module.exports = {
   // Command Toggles
   getCommandToggleSettings,
   updateCommandToggleSettings,
-  isCommandDisabled
+  isCommandDisabled,
+  // Honeypot
+  getHoneypotSettings,
+  updateHoneypotSettings
 };

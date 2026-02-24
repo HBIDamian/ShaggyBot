@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title: title }) %>
+</head>
+<body class="bg-zinc-950 text-white min-h-screen guild-page">
+  <%- include('partials/background') %>
+  <%- include('partials/navbar', { requiresAuth: true, activePage: 'dashboard' }) %>
+
+  <div class="flex min-h-[calc(100vh-65px)] relative z-10">
+    <%- include('partials/sidebar', { activeSection: 'honeypot' }) %>
+
+    <!-- Main Content -->
+    <main class="flex-1 p-4 md:p-8 overflow-y-auto lg:ml-72">
+      <div class="max-w-3xl mx-auto">
+        <div class="mb-6 md:mb-8">
+          <h1 class="text-xl md:text-2xl font-bold mb-2">🍯 Honeypot</h1>
+          <p class="text-zinc-400 text-sm md:text-base">Automatically catch and remove spam bots by monitoring a dedicated trap channel. Any user who sends a message in the honeypot channel will be actioned.</p>
+        </div>
+
+        <!-- How it works callout -->
+        <div class="bg-amber-500/10 border border-amber-500/40 rounded-xl p-4 mb-6 flex gap-3">
+          <span class="text-amber-400 text-xl flex-shrink-0">⚠️</span>
+          <div class="text-sm text-amber-200">
+            <p class="font-medium mb-1">How the honeypot works</p>
+            <p class="text-amber-300/80">Create a channel that real users would never have a reason to message in (e.g. <code class="bg-amber-900/40 px-1 rounded">#honeypot</code> or a channel hidden by permissions from regular members but visible to bots). Set the bot's role above any self-assignable roles. The bot will automatically take action on anyone who posts there.</p>
+          </div>
+        </div>
+
+        <form id="honeypotForm" class="space-y-6">
+          <!-- Master Toggle -->
+          <div class="bg-indigo-600/20 border border-indigo-500 p-6 rounded-xl">
+            <div class="flex justify-between items-center">
+              <div>
+                <h3 class="font-semibold text-lg">Enable Honeypot</h3>
+                <p class="text-sm text-zinc-400">Master switch for the honeypot feature</p>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="enabled" class="sr-only peer">
+                <div class="w-14 h-7 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-indigo-600"></div>
+              </label>
+            </div>
+          </div>
+
+          <!-- Channel Configuration -->
+          <div class="bg-zinc-900 p-6 rounded-xl border border-zinc-800 space-y-4">
+            <div>
+              <h3 class="font-semibold text-lg mb-1">📋 Channel Configuration</h3>
+              <p class="text-sm text-zinc-400">Configure the trap and log channels</p>
+            </div>
+
+            <div>
+              <label for="honeypot_channel_id" class="block text-sm font-medium mb-2">Honeypot Channel <span class="text-red-400">*</span></label>
+              <select id="honeypot_channel_id"
+                      class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 focus:outline-none focus:border-indigo-500 transition channel-select">
+                <option value="">Select a channel...</option>
+              </select>
+              <p class="text-xs text-zinc-500 mt-1.5">Any message sent here will trigger an automatic moderation action</p>
+            </div>
+
+            <div>
+              <label for="log_channel_id" class="block text-sm font-medium mb-2">Log Channel <span class="text-red-400">*</span></label>
+              <select id="log_channel_id"
+                      class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 focus:outline-none focus:border-indigo-500 transition channel-select">
+                <option value="">Select a channel...</option>
+              </select>
+              <p class="text-xs text-zinc-500 mt-1.5">Channel where honeypot catches and failures will be logged</p>
+            </div>
+          </div>
+
+          <!-- Action Configuration -->
+          <div class="bg-zinc-900 p-6 rounded-xl border border-zinc-800 space-y-4">
+            <div>
+              <h3 class="font-semibold text-lg mb-1">⚡ Action</h3>
+              <p class="text-sm text-zinc-400">What to do when a user triggers the honeypot</p>
+            </div>
+
+            <div>
+              <label for="action" class="block text-sm font-medium mb-2">Moderation Action</label>
+              <select id="action" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 focus:outline-none focus:border-indigo-500 transition">
+                <option value="softban">Softban — ban &amp; immediately unban (deletes recent messages)</option>
+                <option value="ban">Ban — permanent ban</option>
+                <option value="kick">Kick — remove from server</option>
+                <option value="nothing">Do Nothing — log the trigger only</option>
+              </select>
+              <p class="text-xs text-zinc-500 mt-1.5">Softban is recommended as it also cleans up the offending messages</p>
+            </div>
+          </div>
+
+          <!-- Additional Options -->
+          <div class="bg-zinc-900 p-6 rounded-xl border border-zinc-800 space-y-3">
+            <div>
+              <h3 class="font-semibold text-lg mb-1">⚙️ Additional Options</h3>
+              <p class="text-sm text-zinc-400">Fine-tune honeypot behaviour</p>
+            </div>
+
+            <div class="flex items-center justify-between gap-4 p-3 bg-zinc-800/50 rounded-lg">
+              <div>
+                <span class="text-sm font-medium">DM User on Trigger</span>
+                <p class="text-xs text-zinc-500">Send the user a DM explaining why they were actioned</p>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="dm_user" class="sr-only peer">
+                <div class="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+              </label>
+            </div>
+
+            <div class="flex items-center justify-between gap-4 p-3 bg-zinc-800/50 rounded-lg">
+              <div>
+                <span class="text-sm font-medium">Keep Channel Empty</span>
+                <p class="text-xs text-zinc-500">After each trigger, bulk-delete all messages in the honeypot channel so only the warning embed remains visible</p>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="keep_channel_empty" class="sr-only peer">
+                <div class="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+              </label>
+            </div>
+          </div>
+
+          <!-- DM Embed Customisation -->
+          <div class="bg-zinc-900 p-6 rounded-xl border border-zinc-800 space-y-4">
+            <div>
+              <h3 class="font-semibold text-lg mb-1">📩 DM Embed</h3>
+              <p class="text-sm text-zinc-400">Customise the DM sent to users when they trigger the honeypot. Only sent when <strong>DM User on Trigger</strong> is enabled. You can use <code class="bg-zinc-800 px-1 rounded text-xs">{action}</code> and <code class="bg-zinc-800 px-1 rounded text-xs">{server}</code> as placeholders.</p>
+            </div>
+
+            <div>
+              <label for="dm_embed_title" class="block text-sm font-medium mb-2">Title</label>
+              <input type="text" id="dm_embed_title" maxlength="256" placeholder="🍯 Honeypot Triggered"
+                     class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500 transition">
+              <p class="text-xs text-zinc-500 mt-1">Max 256 characters</p>
+            </div>
+
+            <div>
+              <label for="dm_embed_description" class="block text-sm font-medium mb-2">Description</label>
+              <textarea id="dm_embed_description" rows="3" maxlength="4096"
+                        placeholder="You have been {action} from **{server}** for sending a message in a honeypot channel."
+                        class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500 transition resize-y"></textarea>
+              <p class="text-xs text-zinc-500 mt-1">Max 4096 characters. Use <code class="bg-zinc-800 px-1 rounded">{action}</code> for the moderation action (e.g. <em>softbanned</em>) and <code class="bg-zinc-800 px-1 rounded">{server}</code> for the server name.</p>
+            </div>
+
+            <div>
+              <label for="dm_embed_footer" class="block text-sm font-medium mb-2">Footer</label>
+              <input type="text" id="dm_embed_footer" maxlength="2048"
+                     placeholder="If you believe this was a mistake, please contact the server administrators."
+                     class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500 transition">
+              <p class="text-xs text-zinc-500 mt-1">Max 2048 characters</p>
+            </div>
+
+            <!-- DM Live Preview -->
+            <div>
+              <p class="text-sm font-medium mb-2">Preview <span class="text-xs text-zinc-500 font-normal">(using current action &amp; server name)</span></p>
+              <div class="bg-[#2b2d31] rounded-lg p-3 border-l-4 border-[#FF6B6B]">
+                <p id="dm_preview_title" class="font-bold text-white text-sm mb-1 whitespace-pre-wrap break-words">🍯 Honeypot Triggered</p>
+                <p id="dm_preview_description" class="text-zinc-300 text-xs whitespace-pre-wrap break-words">You have been softbanned from <strong>Your Server</strong> for sending a message in a honeypot channel.</p>
+                <p id="dm_preview_footer" class="text-zinc-500 text-[11px] mt-2 pt-2 border-t border-zinc-700 whitespace-pre-wrap break-words">If you believe this was a mistake, please contact the server administrators.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Warning Embed Customisation -->
+          <div class="bg-zinc-900 p-6 rounded-xl border border-zinc-800 space-y-4">
+            <div>
+              <h3 class="font-semibold text-lg mb-1">📢 Warning Embed</h3>
+              <p class="text-sm text-zinc-400">Customise the message posted in the honeypot channel to deter real users from interacting with it. Changes are saved with the rest of your settings — use the button below to (re)post the embed in the channel.</p>
+            </div>
+
+            <div>
+              <label for="embed_title" class="block text-sm font-medium mb-2">Title</label>
+              <input type="text" id="embed_title" maxlength="256" placeholder="DO NOT SEND MESSAGES IN THIS CHANNEL"
+                     class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500 transition">
+              <p class="text-xs text-zinc-500 mt-1">Max 256 characters</p>
+            </div>
+
+            <div>
+              <label for="embed_description" class="block text-sm font-medium mb-2">Description</label>
+              <textarea id="embed_description" rows="3" maxlength="4096" placeholder="This channel is used to catch spam bots. Any messages sent here will result in automatic moderation action."
+                        class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500 transition resize-y"></textarea>
+              <p class="text-xs text-zinc-500 mt-1">Max 4096 characters. Supports Discord markdown.</p>
+            </div>
+
+            <div>
+              <label for="embed_image" class="block text-sm font-medium mb-2">Image URL <span class="text-zinc-500 font-normal">(optional)</span></label>
+              <input type="url" id="embed_image" placeholder="https://example.com/image.png"
+                     class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500 transition">
+              <p class="text-xs text-zinc-500 mt-1">A large image displayed at the bottom of the embed</p>
+            </div>
+
+            <!-- Live Preview -->
+            <div>
+              <p class="text-sm font-medium mb-2">Preview</p>
+              <div class="bg-[#2b2d31] rounded-lg p-3 border-l-4 border-[#FF6B6B]">
+                <p id="preview_title" class="font-bold text-white text-sm mb-1 whitespace-pre-wrap break-words">DO NOT SEND MESSAGES IN THIS CHANNEL</p>
+                <p id="preview_description" class="text-zinc-300 text-xs whitespace-pre-wrap break-words">This channel is used to catch spam bots. Any messages sent here will result in automatic moderation action.</p>
+                <img id="preview_image" src="" alt="" class="mt-2 rounded max-w-full hidden" style="max-height:200px;object-fit:cover;">
+              </div>
+            </div>
+
+            <!-- Post button -->
+            <div class="pt-1">
+              <button type="button" id="postWarningBtn"
+                      class="flex items-center gap-2 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed px-5 py-2.5 rounded-lg font-medium text-sm transition">
+                <span id="postWarningBtnIcon">📨</span>
+                <span id="postWarningBtnText">Post Warning Message</span>
+              </button>
+              <p class="text-xs text-zinc-500 mt-1.5">Posts (or edits the existing) warning embed in the honeypot channel. Save your settings first.</p>
+              <p id="postWarningStatus" class="text-xs mt-1.5 hidden"></p>
+            </div>
+          </div>
+
+          <!-- Acknowledgement -->
+          <div class="bg-zinc-900 p-6 rounded-xl border border-zinc-800 space-y-4">
+            <div>
+              <h3 class="font-semibold text-lg mb-1">ℹ️ Acknowledgement</h3>
+              <p class="text-sm text-zinc-400">This honeypot feature was inspired by (and code adapted from) <a href="https://github.com/RiskyMH/honeypot" target="_blank" class="text-amber-400 hover:underline">RiskyMH's Honeypot Bot</a>. If you prefer a more streamlined Honeypot solution and don't mind giving another bot access to your server, check it out! It has many additional features that make honeypot management easier, and more advanced protections to catch even the sneakiest bots.</p>
+            </div>
+          </div>
+
+          <!-- Actions - Desktop -->
+          <div class="hidden md:flex gap-4">
+            <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 px-6 py-2.5 rounded-lg font-medium transition">
+              Save Changes
+            </button>
+            <button type="button" onclick="loadSettings()" class="bg-zinc-800 hover:bg-zinc-700 px-6 py-2.5 rounded-lg font-medium transition">
+              Reset
+            </button>
+          </div>
+        </form>
+
+        <div id="saveStatus" class="mt-4 px-4 py-3 rounded-lg text-sm hidden"></div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Mobile Fixed Save Bar -->
+  <div class="fixed bottom-0 left-0 right-0 bg-zinc-900 border-t border-zinc-800 p-4 flex gap-3 md:hidden z-50">
+    <button type="button" onclick="document.getElementById('honeypotForm').dispatchEvent(new Event('submit', {cancelable: true, bubbles: true}))" class="flex-1 bg-indigo-600 hover:bg-indigo-700 px-4 py-3 rounded-lg font-medium transition">
+      Save Changes
+    </button>
+    <button type="button" onclick="loadSettings()" class="bg-zinc-800 hover:bg-zinc-700 px-4 py-3 rounded-lg font-medium transition">
+      Reset
+    </button>
+  </div>
+  <div class="h-20 md:hidden"></div>
+
+  <script>
+    const DEFAULT_EMBED_TITLE = 'DO NOT SEND MESSAGES IN THIS CHANNEL';
+    const DEFAULT_EMBED_DESC  = 'This channel is used to catch spam bots. Any messages sent here will result in automatic moderation action.';
+    const DEFAULT_DM_TITLE    = '\uD83C\uDF6F Honeypot Triggered';
+    const DEFAULT_DM_DESC     = 'You have been {action} from **{server}** for sending a message in a honeypot channel.';
+    const DEFAULT_DM_FOOTER   = 'If you believe this was a mistake, please contact the server administrators.';
+
+    let allChannels = [];
+    let guildName   = '';
+
+    function onGuildReady(data) {
+      document.title = `Honeypot - ${data.name} - ShaggyBot`;
+      allChannels = data.channels;
+      guildName   = data.name;
+
+      // Populate all channel selects
+      document.querySelectorAll('.channel-select').forEach(select => {
+        data.channels.forEach(channel => {
+          const option = document.createElement('option');
+          option.value = channel.id;
+          option.textContent = `#${channel.name}`;
+          select.appendChild(option);
+        });
+      });
+
+      loadSettings();
+    }
+
+    function loadSettings() {
+      fetch(`/api/guilds/${guildId}/honeypot`).then(res => res.json()).then(settings => {
+        document.getElementById('enabled').checked = !!settings.enabled;
+        document.getElementById('honeypot_channel_id').value = settings.honeypot_channel_id || '';
+        document.getElementById('log_channel_id').value = settings.log_channel_id || '';
+        document.getElementById('action').value = settings.action || 'softban';
+        document.getElementById('dm_user').checked = settings.dm_user !== 0;
+        document.getElementById('keep_channel_empty').checked = settings.keep_channel_empty !== 0;
+
+        document.getElementById('embed_title').value = settings.embed_title || '';
+        document.getElementById('embed_description').value = settings.embed_description || '';
+        document.getElementById('embed_image').value = settings.embed_image || '';
+
+        document.getElementById('dm_embed_title').value = settings.dm_embed_title || '';
+        document.getElementById('dm_embed_description').value = settings.dm_embed_description || '';
+        document.getElementById('dm_embed_footer').value = settings.dm_embed_footer || '';
+
+        updatePreview();
+        updateDmPreview();
+      }).catch(() => {
+        updatePreview();
+        updateDmPreview();
+      });
+    }
+
+    // Live preview
+    function updatePreview() {
+      const title = document.getElementById('embed_title').value.trim() || DEFAULT_EMBED_TITLE;
+      const desc  = document.getElementById('embed_description').value.trim() || DEFAULT_EMBED_DESC;
+      const img   = document.getElementById('embed_image').value.trim();
+
+      document.getElementById('preview_title').textContent = title;
+      document.getElementById('preview_description').textContent = desc;
+
+      const previewImg = document.getElementById('preview_image');
+      if (img) {
+        previewImg.src = img;
+        previewImg.classList.remove('hidden');
+        previewImg.onerror = () => previewImg.classList.add('hidden');
+      } else {
+        previewImg.src = '';
+        previewImg.classList.add('hidden');
+      }
+    }
+
+    document.getElementById('embed_title').addEventListener('input', updatePreview);
+    document.getElementById('embed_description').addEventListener('input', updatePreview);
+    document.getElementById('embed_image').addEventListener('input', updatePreview);
+
+    // DM embed live preview
+    const DM_SAMPLE_ACTION = 'softbanned';
+    function updateDmPreview() {
+      const title  = document.getElementById('dm_embed_title').value.trim()       || DEFAULT_DM_TITLE;
+      const rawDesc = document.getElementById('dm_embed_description').value.trim() || DEFAULT_DM_DESC;
+      const footer = document.getElementById('dm_embed_footer').value.trim()      || DEFAULT_DM_FOOTER;
+
+      // Replace placeholders for preview
+      const serverName = (typeof guildName !== 'undefined' && guildName) ? guildName : 'Your Server';
+      const desc = rawDesc
+        .replace(/\{action\}/g, DM_SAMPLE_ACTION)
+        .replace(/\{server\}/g, serverName);
+
+      document.getElementById('dm_preview_title').textContent = title;
+      document.getElementById('dm_preview_description').innerHTML = desc
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\n/g, '<br>');
+      document.getElementById('dm_preview_footer').textContent = footer;
+    }
+
+    document.getElementById('dm_embed_title').addEventListener('input', updateDmPreview);
+    document.getElementById('dm_embed_description').addEventListener('input', updateDmPreview);
+    document.getElementById('dm_embed_footer').addEventListener('input', updateDmPreview);
+
+    document.getElementById('honeypotForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const data = {
+        enabled: document.getElementById('enabled').checked ? 1 : 0,
+        honeypot_channel_id: document.getElementById('honeypot_channel_id').value || null,
+        log_channel_id: document.getElementById('log_channel_id').value || null,
+        action: document.getElementById('action').value,
+        dm_user: document.getElementById('dm_user').checked ? 1 : 0,
+        keep_channel_empty: document.getElementById('keep_channel_empty').checked ? 1 : 0,
+        embed_title: document.getElementById('embed_title').value.trim() || null,
+        embed_description: document.getElementById('embed_description').value.trim() || null,
+        embed_image: document.getElementById('embed_image').value.trim() || null,
+        dm_embed_title: document.getElementById('dm_embed_title').value.trim() || null,
+        dm_embed_description: document.getElementById('dm_embed_description').value.trim() || null,
+        dm_embed_footer: document.getElementById('dm_embed_footer').value.trim() || null
+      };
+
+      const status = document.getElementById('saveStatus');
+      status.textContent = 'Saving...';
+      status.className = 'mt-4 px-4 py-3 rounded-lg text-sm bg-zinc-800 text-zinc-400';
+      status.classList.remove('hidden');
+
+      try {
+        const res = await fetch(`/api/guilds/${guildId}/honeypot`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        if (res.ok) {
+          status.textContent = '✓ Honeypot settings saved successfully!';
+          status.className = 'mt-4 px-4 py-3 rounded-lg text-sm bg-green-500/20 text-green-400';
+        } else {
+          throw new Error('Failed');
+        }
+      } catch {
+        status.textContent = '✗ Failed to save settings. Please try again.';
+        status.className = 'mt-4 px-4 py-3 rounded-lg text-sm bg-red-500/20 text-red-400';
+      }
+      setTimeout(() => { status.classList.add('hidden'); }, 3000);
+    });
+
+    // Post warning embed button
+    document.getElementById('postWarningBtn').addEventListener('click', async () => {
+      const btn      = document.getElementById('postWarningBtn');
+      const btnText  = document.getElementById('postWarningBtnText');
+      const btnIcon  = document.getElementById('postWarningBtnIcon');
+      const postStatus = document.getElementById('postWarningStatus');
+
+      btn.disabled = true;
+      btnIcon.textContent = '⏳';
+      btnText.textContent = 'Sending…';
+      postStatus.classList.add('hidden');
+
+      try {
+        const res = await fetch(`/api/guilds/${guildId}/honeypot/send-warning`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        const result = await res.json();
+
+        if (res.ok) {
+          const verb = result.action === 'edited' ? 'updated' : 'posted';
+          postStatus.textContent = `✓ Warning embed ${verb} in the honeypot channel.`;
+          postStatus.className = 'text-xs mt-1.5 text-green-400';
+        } else {
+          postStatus.textContent = `✗ ${result.error || 'Failed to post warning message.'}`;
+          postStatus.className = 'text-xs mt-1.5 text-red-400';
+        }
+      } catch {
+        postStatus.textContent = '✗ Failed to post warning message. Please try again.';
+        postStatus.className = 'text-xs mt-1.5 text-red-400';
+      }
+
+      postStatus.classList.remove('hidden');
+      btnIcon.textContent = '📨';
+      btnText.textContent = 'Post Warning Message';
+      btn.disabled = false;
+      setTimeout(() => { postStatus.classList.add('hidden'); }, 4000);
+    });
+  </script>
+  <%- include('partials/scripts/guild-loader') %>
+</body>
+</html>

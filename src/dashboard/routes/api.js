@@ -173,6 +173,66 @@ createSettingsRoutes('/auditlog', db.getAuditLogSettings.bind(db), db.updateAudi
 createSettingsRoutes('/starboard', db.getStarboardSettings.bind(db), db.updateStarboardSettings.bind(db), 'starboard');
 createSettingsRoutes('/antiraid', db.getAntiRaidSettings.bind(db), db.updateAntiRaidSettings.bind(db), 'anti-raid');
 createSettingsRoutes('/commandtoggles', db.getCommandToggleSettings.bind(db), db.updateCommandToggleSettings.bind(db), 'command toggles');
+createSettingsRoutes('/honeypot', db.getHoneypotSettings.bind(db), db.updateHoneypotSettings.bind(db), 'honeypot');
+
+/**
+ * Post or refresh the warning embed in the honeypot channel
+ */
+router.post('/guilds/:guildId/honeypot/send-warning', requireAuth, requireGuildPermission, async (req, res) => {
+  const { guildId } = req.params;
+  const client = req.app.get('client');
+  const { EmbedBuilder } = require('discord.js');
+
+  try {
+    const settings = db.getHoneypotSettings(guildId);
+
+    if (!settings.honeypot_channel_id) {
+      return res.status(400).json({ error: 'No honeypot channel configured' });
+    }
+
+    const guild = client.guilds.cache.get(guildId);
+    if (!guild) return res.status(404).json({ error: 'Guild not found' });
+
+    const channel = await guild.channels.fetch(settings.honeypot_channel_id).catch(() => null);
+    if (!channel) return res.status(404).json({ error: 'Honeypot channel not found' });
+
+    const title = settings.embed_title || 'DO NOT SEND MESSAGES IN THIS CHANNEL';
+    const description = settings.embed_description || 'This channel is used to catch spam bots. Any messages sent here will result in automatic moderation action.';
+
+    const embed = new EmbedBuilder()
+      .setColor(0xFF6B6B)
+      .setTitle(title)
+      .setDescription(description);
+
+    if (settings.embed_image) {
+      embed.setImage(settings.embed_image);
+    }
+
+    // Try to edit the existing message first
+    if (settings.embed_message_id) {
+      try {
+        const existing = await channel.messages.fetch(settings.embed_message_id);
+        if (existing && existing.editable) {
+          await existing.edit({ embeds: [embed] });
+          logger.info(`Updated honeypot warning embed in ${guild.name}`);
+          return res.json({ success: true, action: 'edited', message_id: existing.id });
+        }
+      } catch {
+        // Message was deleted or not found - fall through to send a new one
+      }
+    }
+
+    // Send a fresh message
+    const sent = await channel.send({ embeds: [embed] });
+    db.updateHoneypotSettings(guildId, { embed_message_id: sent.id });
+    logger.info(`Sent honeypot warning embed in ${guild.name} (${sent.id})`);
+    return res.json({ success: true, action: 'sent', message_id: sent.id });
+
+  } catch (err) {
+    logger.error(`Error sending honeypot warning: ${err.message}`);
+    res.status(500).json({ error: 'Failed to send warning message' });
+  }
+});
 
 /**
  * Get mod actions for a guild

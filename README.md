@@ -105,7 +105,7 @@ All moderation commands support:
 
 ## 📋 Requirements
 
-- Node.js 18.0.0 or newer
+- [Bun](https://bun.sh) 1.3.9 or newer
 - Discord Bot Token
 - Discord OAuth2 Application (for dashboard)
 - OpenAI API Key (optional, for `/monkeyspaw` command)
@@ -120,7 +120,7 @@ All moderation commands support:
 
 2. **Install dependencies**
    ```bash
-   npm install
+   bun install
    ```
 
 3. **Configure environment variables**
@@ -143,7 +143,7 @@ All moderation commands support:
 
 4. **Start the bot**
    ```bash
-   npm start
+   bun start
    ```
 
    Commands are automatically deployed on startup.
@@ -205,13 +205,13 @@ shaggyBot-js/
 
 ```bash
 # Run with auto-restart on changes
-npm run dev
+bun dev
 
 # Manually deploy commands
-npm run deploy
+bun run deploy
 
 # Lint code
-npm run lint
+bun lint
 ```
 
 ## 📊 Database
@@ -220,6 +220,7 @@ ShaggyBot uses SQLite for data persistence. The database is automatically create
 - Guild settings
 - Moderation settings & logs
 - Auto-mod configuration
+- Honeypot
 - Warnings
 - Tags
 - Starboard messages
@@ -240,3 +241,8 @@ ShaggyBot uses SQLite for data persistence. The database is automatically create
 - Attach Files
 - Add Reactions
 - Moderate Members (for timeouts)
+
+## 📝 License
+
+GNU GENERAL PUBLIC LICENSE
+
