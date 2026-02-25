@@ -31,7 +31,7 @@
             <button type="button" onclick="setAllExport(false)" class="underline hover:text-white transition">Deselect all</button>
           </div>
 
-          <div id="exportSections" class="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-5">
+          <div id="exportSections" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-5">
             <!-- Rendered by JS -->
           </div>
 
@@ -99,7 +99,7 @@
               <span>·</span>
               <button type="button" onclick="setAllRestore(false)" class="underline hover:text-white transition">Deselect all</button>
             </div>
-            <div id="restoreSections" class="grid grid-cols-2 sm:grid-cols-3 gap-2"></div>
+            <div id="restoreSections" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2"></div>
             <p class="text-xs text-zinc-600 mt-2">Only sections present in the backup file are shown. Greyed items are missing from the file.</p>
           </div>
 
@@ -181,14 +181,20 @@
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
-    /** Build a toggle checkbox item */
+    /** Build a toggle switch item (matches other dashboard pages) */
     function buildToggle(key, label, checked, disabled = false) {
-      const disabledClass = disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:bg-zinc-800/70';
+      const wrapClass = disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:bg-zinc-800/70';
       return `
-        <label class="flex items-center gap-2 px-3 py-2 rounded-lg bg-zinc-800/40 select-none ${disabledClass}" title="${disabled ? 'Not present in this backup' : ''}">
-          <input type="checkbox" class="section-toggle accent-indigo-500 w-4 h-4 flex-shrink-0"
-            data-key="${key}" ${checked ? 'checked' : ''} ${disabled ? 'disabled' : ''}>
-          <span class="text-sm truncate">${label}</span>
+        <label class="flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg bg-zinc-800/40 select-none ${wrapClass}" title="${disabled ? 'Not present in this backup' : ''}">
+          <span class="text-sm leading-snug">${label}</span>
+          <div class="relative inline-flex items-center flex-shrink-0">
+            <input type="checkbox" class="sr-only peer section-toggle"
+              data-key="${key}" ${checked ? 'checked' : ''} ${disabled ? 'disabled' : ''}>
+            <div class="w-11 h-6 bg-zinc-700 rounded-full peer peer-checked:bg-indigo-600
+                        peer-checked:after:translate-x-full peer-checked:after:border-white
+                        after:content-[''] after:absolute after:top-0.5 after:left-[2px]
+                        after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
+          </div>
         </label>`;
     }
 
