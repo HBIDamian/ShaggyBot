@@ -9,6 +9,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('unwarn')
     .setDescription('Remove a warning from a user')
+    .setDMPermission(false)
     .addIntegerOption(option =>
       option.setName('id')
         .setDescription('The warning ID to remove')

@@ -13,6 +13,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('unban')
     .setDescription('Pardons (unbans) the specified user')
+    .setDMPermission(false)
     .addStringOption(option =>
       option.setName('user_id')
         .setDescription('The user ID to unban')

@@ -898,4 +898,467 @@ router.get('/commands', (req, res) => {
   res.json(commandsByCategory);
 });
 
+// ============================================================
+// SERVER BACKUP & RESTORE
+// ============================================================
+
+// All known exportable section keys
+const ALL_BACKUP_SECTIONS = [
+  'guild', 'automod', 'moderation', 'audit_log', 'starboard',
+  'anti_raid', 'troll_discourager', 'honeypot', 'command_toggles',
+  'tags', 'warnings',
+  'discord_guild_info', 'discord_roles', 'discord_channels',
+];
+
+/**
+ * Export bot-managed settings AND Discord server structure for a guild as a JSON backup.
+ * Optional query param: ?sections=guild,automod,discord_roles  (comma-separated)
+ * If omitted, all sections except warnings are included.
+ *
+ * v2 JSON structure:
+ *   { version, exported_at, guild_id, guild_name,
+ *     bot:     { settings: {…}, tags, announcements, warnings },
+ *     discord: { guild_info, roles, channels }           }
+ */
+router.get('/guilds/:guildId/backup', requireAuth, requireGuildPermission, async (req, res) => {
+  const { guildId } = req.params;
+  const guild = req.guild; // Discord.js Guild object
+
+  const requested = req.query.sections
+    ? req.query.sections.split(',').map(s => s.trim()).filter(s => ALL_BACKUP_SECTIONS.includes(s))
+    : ALL_BACKUP_SECTIONS.filter(s => s !== 'warnings');
+
+  const want = (key) => requested.includes(key);
+
+  try {
+    // ── Bot settings ────────────────────────────────────────────────────────
+    const settings = {};
+    if (want('guild'))             settings.guild             = db.getGuildSettings(guildId);
+    if (want('automod'))           settings.automod           = db.getAutomodSettings(guildId);
+    if (want('moderation'))        settings.moderation        = db.getModerationSettings(guildId);
+    if (want('audit_log'))         settings.audit_log         = db.getAuditLogSettings(guildId);
+    if (want('starboard'))         settings.starboard         = db.getStarboardSettings(guildId);
+    if (want('anti_raid'))         settings.anti_raid         = db.getAntiRaidSettings(guildId);
+    if (want('troll_discourager')) settings.troll_discourager = db.getTrollDiscouragerSettings(guildId);
+    if (want('honeypot'))          settings.honeypot          = db.getHoneypotSettings(guildId);
+    if (want('command_toggles'))   settings.command_toggles   = db.getCommandToggleSettings(guildId);
+
+    const bot = {
+      settings,
+      ...(want('tags')     && { tags:     db.getTags(guildId) }),
+      ...(want('warnings') && { warnings: db.getAllWarnings(guildId) }),
+    };
+
+    // ── Discord server structure ─────────────────────────────────────────────
+    const discord = {};
+
+    if (want('discord_guild_info')) {
+      discord.guild_info = {
+        name:                        guild.name,
+        description:                 guild.description,
+        verificationLevel:           guild.verificationLevel,
+        explicitContentFilter:       guild.explicitContentFilter,
+        defaultMessageNotifications: guild.defaultMessageNotifications,
+        preferredLocale:             guild.preferredLocale,
+        afkTimeout:                  guild.afkTimeout,
+        systemChannelId:             guild.systemChannelId,
+        afkChannelId:                guild.afkChannelId,
+        rulesChannelId:              guild.rulesChannelId,
+        publicUpdatesChannelId:      guild.publicUpdatesChannelId,
+        iconURL:                     guild.iconURL({ dynamic: true }) ?? null,
+      };
+    }
+
+    if (want('discord_roles')) {
+      discord.roles = [...guild.roles.cache.values()]
+        .filter(r => r.id !== guild.id && !r.managed) // exclude @everyone and bot-managed roles
+        .sort((a, b) => b.position - a.position)
+        .map(r => ({
+          id:          r.id,
+          name:        r.name,
+          // Store the primary color integer (0 = no color)
+          primaryColor: r.colors?.primaryColor ?? r.color ?? 0,
+          hoist:       r.hoist,
+          mentionable: r.mentionable,
+          permissions: r.permissions?.bitfield?.toString() ?? '0',
+          position:    r.position,
+        }));
+    }
+
+    if (want('discord_channels')) {
+      const { ChannelType } = require('discord.js');
+      discord.channels = [...guild.channels.cache.values()]
+        .sort((a, b) => {
+          // Categories first, then by position
+          if (a.type === ChannelType.GuildCategory && b.type !== ChannelType.GuildCategory) return -1;
+          if (a.type !== ChannelType.GuildCategory && b.type === ChannelType.GuildCategory) return 1;
+          return (a.rawPosition ?? 0) - (b.rawPosition ?? 0);
+        })
+        .map(ch => ({
+          id:               ch.id,
+          name:             ch.name,
+          type:             ch.type,
+          position:         ch.rawPosition ?? 0,
+          parentId:         ch.parentId ?? null,
+          topic:            ch.topic     ?? null,
+          nsfw:             ch.nsfw      ?? false,
+          bitrate:          ch.bitrate   ?? null,
+          userLimit:        ch.userLimit ?? null,
+          rateLimitPerUser: ch.rateLimitPerUser ?? null,
+          permissionOverwrites: ch.permissionOverwrites?.cache
+            ? [...ch.permissionOverwrites.cache.values()].map(ow => ({
+                id:    ow.id,
+                type:  ow.type, // 0 = role, 1 = member
+                allow: ow.allow.bitfield.toString(),
+                deny:  ow.deny.bitfield.toString(),
+              }))
+            : [],
+        }));
+    }
+
+    const backup = {
+      version: 2,
+      exported_at: new Date().toISOString(),
+      guild_id: guildId,
+      guild_name: guild.name,
+      bot,
+      ...(Object.keys(discord).length > 0 && { discord }),
+    };
+
+    const filename = `shaggybot-backup-${guildId}-${Date.now()}.json`;
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Type', 'application/json');
+    res.json(backup);
+    logger.info(`Backup exported for ${guild.name} (${guildId}): [${requested.join(', ')}]`);
+  } catch (err) {
+    logger.error(`Error exporting backup for ${guildId}: ${err.message}`);
+    res.status(500).json({ error: 'Failed to export backup' });
+  }
+});
+
+/**
+ * Import a JSON backup and restore settings — streams progress via Server-Sent Events.
+ * Body format: { backup: <backupObject>, restore_sections: ['guild', 'automod', ...] }
+ * - Supports v1 (legacy flat format) and v2 (bot/discord split).
+ * - Only sections both present in the backup AND listed in restore_sections are applied.
+ * - restore_sections is optional; if omitted all sections found in the backup are restored.
+ */
+router.post('/guilds/:guildId/restore', requireAuth, requireGuildPermission, async (req, res) => {
+  const { guildId } = req.params;
+  const guild = req.guild;
+
+  const isNewFormat = req.body && req.body.backup && typeof req.body.backup === 'object';
+  const backup = isNewFormat ? req.body.backup : req.body;
+  const restoreSections = isNewFormat && Array.isArray(req.body.restore_sections)
+    ? req.body.restore_sections
+    : null;
+
+  const version = backup?.version;
+  if (!backup || (version !== 1 && version !== 2)) {
+    return res.status(400).json({ error: 'Invalid backup file format' });
+  }
+  if (version === 1 && !backup.settings) {
+    return res.status(400).json({ error: 'Invalid backup file format (v1 missing settings)' });
+  }
+  if (version === 2 && !backup.bot) {
+    return res.status(400).json({ error: 'Invalid backup file format (v2 missing bot data)' });
+  }
+  if (backup.guild_id && backup.guild_id !== guildId) {
+    return res.status(400).json({ error: 'This backup belongs to a different server' });
+  }
+
+  // ── SSE setup ────────────────────────────────────────────────────────────
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  const send = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+
+  const shouldRestore = (key) => restoreSections === null || restoreSections.includes(key);
+
+  const restored = [];
+  const failed   = [];
+
+  // Count total sections to restore so the client can show accurate progress
+  const s       = version === 2 ? (backup.bot?.settings || {}) : (backup.settings || {});
+  const botData = version === 2 ? (backup.bot || {})           : backup;
+  const disc    = backup.discord;
+
+  const willRestore = [
+    (s.guild             && shouldRestore('guild'))             ? 'guild'             : null,
+    (s.automod           && shouldRestore('automod'))           ? 'automod'           : null,
+    (s.moderation        && shouldRestore('moderation'))        ? 'moderation'        : null,
+    (s.audit_log         && shouldRestore('audit_log'))         ? 'audit_log'         : null,
+    (s.starboard         && shouldRestore('starboard'))         ? 'starboard'         : null,
+    (s.anti_raid         && shouldRestore('anti_raid'))         ? 'anti_raid'         : null,
+    (s.troll_discourager && shouldRestore('troll_discourager')) ? 'troll_discourager' : null,
+    (s.honeypot          && shouldRestore('honeypot'))          ? 'honeypot'          : null,
+    (s.command_toggles   && shouldRestore('command_toggles'))   ? 'command_toggles'   : null,
+    (Array.isArray(botData.tags)     && botData.tags.length > 0 && shouldRestore('tags'))     ? 'tags'     : null,
+    (Array.isArray(botData.warnings)   && shouldRestore('warnings'))                          ? 'warnings' : null,
+    (disc?.guild_info && shouldRestore('discord_guild_info')) ? 'discord_guild_info' : null,
+    (Array.isArray(disc?.roles)     && disc.roles.length > 0     && shouldRestore('discord_roles'))    ? 'discord_roles'    : null,
+    (Array.isArray(disc?.channels)  && disc.channels.length > 0  && shouldRestore('discord_channels')) ? 'discord_channels' : null,
+  ].filter(Boolean);
+
+  send('start', { total: willRestore.length, sections: willRestore });
+
+  const attempt = (name, fn) => {
+    try {
+      fn();
+      restored.push(name);
+      send('progress', { section: name, status: 'ok', restored: restored.length, total: willRestore.length });
+    } catch (e) {
+      failed.push(name);
+      logger.error(`Restore [${name}] for ${guildId}: ${e.message}`);
+      send('progress', { section: name, status: 'error', message: e.message, restored: restored.length, total: willRestore.length });
+    }
+  };
+  const attemptAsync = async (name, fn) => {
+    try {
+      await fn();
+      restored.push(name);
+      send('progress', { section: name, status: 'ok', restored: restored.length, total: willRestore.length });
+    } catch (e) {
+      failed.push(name);
+      logger.error(`Restore [${name}] for ${guildId}: ${e.message}`);
+      send('progress', { section: name, status: 'error', message: e.message, restored: restored.length, total: willRestore.length });
+    }
+  };
+
+  // ── Bot settings ─────────────────────────────────────────────────────────
+  if (s.guild             && shouldRestore('guild'))             attempt('guild',             () => db.updateGuildSettings(guildId, s.guild));
+  if (s.automod           && shouldRestore('automod'))           attempt('automod',           () => db.updateAutomodSettings(guildId, s.automod));
+  if (s.moderation        && shouldRestore('moderation'))        attempt('moderation',        () => db.updateModerationSettings(guildId, s.moderation));
+  if (s.audit_log         && shouldRestore('audit_log'))         attempt('audit_log',         () => db.updateAuditLogSettings(guildId, s.audit_log));
+  if (s.starboard         && shouldRestore('starboard'))         attempt('starboard',         () => db.updateStarboardSettings(guildId, s.starboard));
+  if (s.anti_raid         && shouldRestore('anti_raid'))         attempt('anti_raid',         () => db.updateAntiRaidSettings(guildId, s.anti_raid));
+  if (s.troll_discourager && shouldRestore('troll_discourager')) attempt('troll_discourager', () => db.updateTrollDiscouragerSettings(guildId, s.troll_discourager));
+  if (s.honeypot          && shouldRestore('honeypot'))          attempt('honeypot',          () => db.updateHoneypotSettings(guildId, s.honeypot));
+  if (s.command_toggles   && shouldRestore('command_toggles'))   attempt('command_toggles',   () => db.updateCommandToggleSettings(guildId, s.command_toggles));
+
+  if (Array.isArray(botData.tags) && botData.tags.length > 0 && shouldRestore('tags')) {
+    attempt('tags', () => {
+      for (const tag of botData.tags) {
+        if (!tag.name || !tag.response) continue;
+        const existing = db.getTag(guildId, tag.name);
+        if (!existing) db.createTag(guildId, tag.name, tag.response, tag.owner_id || '0', tag.owner_name || 'Unknown');
+      }
+    });
+  }
+  if (Array.isArray(botData.warnings) && shouldRestore('warnings')) {
+    attempt('warnings', () => db.bulkInsertWarnings(guildId, botData.warnings));
+  }
+
+  // ── Discord server structure ─────────────────────────────────────────────
+  if (disc?.guild_info && shouldRestore('discord_guild_info')) {
+    await attemptAsync('discord_guild_info', async () => {
+      const info = disc.guild_info;
+      const payload = {};
+      if (info.name                        != null) payload.name                        = info.name;
+      if (info.description                 != null) payload.description                 = info.description;
+      if (info.verificationLevel           != null) payload.verificationLevel           = info.verificationLevel;
+      if (info.explicitContentFilter       != null) payload.explicitContentFilter       = info.explicitContentFilter;
+      if (info.defaultMessageNotifications != null) payload.defaultMessageNotifications = info.defaultMessageNotifications;
+      if (info.preferredLocale             != null) payload.preferredLocale             = info.preferredLocale;
+      if (info.afkTimeout                  != null) payload.afkTimeout                  = info.afkTimeout;
+      if (Object.keys(payload).length > 0) await guild.edit(payload);
+    });
+  }
+
+  // Safe BigInt conversion — tolerates JS undefined, null, and strings like "undefined"
+  const safeBigInt = (val) => { try { return BigInt(val ?? '0'); } catch { return 0n; } };
+
+  // role id map: original backup id -> restored/existing role id
+  const roleIdMap = {};
+
+  if (Array.isArray(disc?.roles) && disc.roles.length > 0 && shouldRestore('discord_roles')) {
+    await attemptAsync('discord_roles', async () => {
+      // Bot cannot manage roles at or above its own highest role
+      const botMember  = guild.members.me ?? await guild.members.fetchMe();
+      const botHighest = botMember.roles.highest.position;
+
+      for (const roleData of disc.roles) {
+        try {
+          const existing = guild.roles.cache.find(r => r.name === roleData.name && !r.managed);
+
+          // Skip roles at or above the bot's highest role
+          if (existing && existing.position >= botHighest) {
+            logger.warn(`Restore [discord_roles]: skipping "${roleData.name}" (position ${existing.position} >= bot highest ${botHighest})`);
+            roleIdMap[roleData.id] = existing.id;
+            continue;
+          }
+
+          const payload = {
+            name:        roleData.name,
+            hoist:       roleData.hoist        ?? false,
+            mentionable: roleData.mentionable  ?? false,
+            permissions: safeBigInt(roleData.permissions),
+          };
+
+          // colors is an object { primaryColor } in discord.js 14.16+
+          // Only include when non-zero (0 = default/no color)
+          const primaryColor = roleData.primaryColor ?? roleData.color ?? 0;
+          const colorsObj = primaryColor !== 0 ? { primaryColor } : undefined;
+
+          if (existing) {
+            const editData = { ...payload, reason: 'ShaggyBot backup restore' };
+            if (colorsObj) editData.colors = colorsObj;
+            const updated = await existing.edit(editData);
+            roleIdMap[roleData.id] = updated.id;
+          } else {
+            const createData = { ...payload, reason: 'ShaggyBot backup restore' };
+            if (colorsObj) createData.colors = colorsObj;
+            const created = await guild.roles.create(createData);
+            roleIdMap[roleData.id] = created.id;
+          }
+        } catch (roleErr) {
+          logger.warn(`Restore [discord_roles]: failed to restore role "${roleData.name}": ${roleErr.message}`);
+          // Map the id anyway if an existing role was found, so channel overwrites still resolve
+          const fallback = guild.roles.cache.find(r => r.name === roleData.name);
+          if (fallback) roleIdMap[roleData.id] = fallback.id;
+        }
+      }
+    });
+  }
+
+  if (Array.isArray(disc?.channels) && disc.channels.length > 0 && shouldRestore('discord_channels')) {
+    await attemptAsync('discord_channels', async () => {
+      const { ChannelType } = require('discord.js');
+
+      const buildOverwrites = (overwrites) =>
+        (overwrites || []).map(ow => ({
+          id:    ow.type === 0 ? (roleIdMap[ow.id] ?? ow.id) : ow.id,
+          type:  ow.type,
+          allow: safeBigInt(ow.allow),
+          deny:  safeBigInt(ow.deny),
+        }));
+
+      const categories    = disc.channels.filter(c => c.type === ChannelType.GuildCategory);
+      const nonCategories = disc.channels.filter(c => c.type !== ChannelType.GuildCategory);
+      const categoryIdMap = {};
+
+      // Restore categories first so children can reference them
+      for (const cat of categories) {
+        try {
+          const existing = guild.channels.cache.find(
+            c => c.name === cat.name && c.type === ChannelType.GuildCategory,
+          );
+          const payload = {
+            name:                 cat.name,
+            position:             cat.position,
+            permissionOverwrites: buildOverwrites(cat.permissionOverwrites),
+            reason:               'ShaggyBot backup restore',
+          };
+          if (existing) {
+            await existing.edit(payload);
+            categoryIdMap[cat.id] = existing.id;
+          } else {
+            const created = await guild.channels.create({ ...payload, type: ChannelType.GuildCategory });
+            categoryIdMap[cat.id] = created.id;
+          }
+        } catch (catErr) {
+          logger.warn(`Restore [discord_channels]: failed to restore category "${cat.name}": ${catErr.message}`);
+          const fallback = guild.channels.cache.find(c => c.name === cat.name && c.type === ChannelType.GuildCategory);
+          if (fallback) categoryIdMap[cat.id] = fallback.id;
+        }
+      }
+
+      // Restore non-category channels
+      for (const ch of nonCategories) {
+        try {
+          const existing = guild.channels.cache.find(c => c.name === ch.name && c.type === ch.type);
+          const parentId = ch.parentId ? (categoryIdMap[ch.parentId] ?? ch.parentId) : null;
+          const payload = {
+            name:                 ch.name,
+            type:                 ch.type,
+            position:             ch.position,
+            parent:               parentId,
+            permissionOverwrites: buildOverwrites(ch.permissionOverwrites),
+            reason:               'ShaggyBot backup restore',
+            ...(ch.topic            != null && { topic:            ch.topic            }),
+            ...(ch.nsfw             != null && { nsfw:             ch.nsfw             }),
+            ...(ch.bitrate          != null && { bitrate:          ch.bitrate          }),
+            ...(ch.userLimit        != null && { userLimit:        ch.userLimit        }),
+            ...(ch.rateLimitPerUser != null && { rateLimitPerUser: ch.rateLimitPerUser }),
+          };
+          if (existing) {
+            await existing.edit(payload);
+          } else {
+            await guild.channels.create(payload);
+          }
+        } catch (chErr) {
+          logger.warn(`Restore [discord_channels]: failed to restore channel "${ch.name}": ${chErr.message}`);
+        }
+      }
+    });
+  }
+
+  logger.info(`Backup restored for ${guild.name} (${guildId}): [${restored.join(', ')}]`);
+  send('done', { success: true, restored, failed });
+  res.end();
+});
+
+// ============================================================
+// SCHEDULED ANNOUNCEMENTS
+// ============================================================
+
+/**
+ * List all announcements for a guild
+ */
+router.get('/guilds/:guildId/announcements', requireAuth, requireGuildPermission, (req, res) => {
+  res.json(db.getAnnouncements(req.params.guildId));
+});
+
+/**
+ * Create a new announcement
+ */
+router.post('/guilds/:guildId/announcements', requireAuth, requireGuildPermission, (req, res) => {
+  const { guildId } = req.params;
+  const data = { ...req.body, created_by: req.session.user.id };
+  try {
+    const announcement = db.createAnnouncement(guildId, data);
+    logger.info(`Created announcement #${announcement.id} for ${req.guild.name}`);
+    res.status(201).json(announcement);
+  } catch (err) {
+    logger.error(`Error creating announcement: ${err.message}`);
+    res.status(500).json({ error: 'Failed to create announcement' });
+  }
+});
+
+/**
+ * Update an existing announcement
+ */
+router.patch('/guilds/:guildId/announcements/:id', requireAuth, requireGuildPermission, (req, res) => {
+  const { guildId, id } = req.params;
+  const updates = req.body;
+
+  // If schedule fields are changing, recompute next_run_at
+  const scheduleFields = ['schedule_type', 'run_at', 'interval_minutes', 'day_of_week'];
+  if (scheduleFields.some(f => f in updates)) {
+    const existing = db.getAnnouncementById(Number(id), guildId);
+    if (existing) {
+      const merged = { ...existing, ...updates };
+      updates.next_run_at = db.computeNextRun(merged);
+    }
+  }
+
+  const result = db.updateAnnouncement(Number(id), guildId, updates);
+  if (!result) return res.status(404).json({ error: 'Announcement not found' });
+  logger.info(`Updated announcement #${id} for ${req.guild.name}`);
+  res.json(result);
+});
+
+/**
+ * Delete an announcement
+ */
+router.delete('/guilds/:guildId/announcements/:id', requireAuth, requireGuildPermission, (req, res) => {
+  const { guildId, id } = req.params;
+  const deleted = db.deleteAnnouncement(Number(id), guildId);
+  if (!deleted) return res.status(404).json({ error: 'Announcement not found' });
+  logger.info(`Deleted announcement #${id} for ${req.guild.name}`);
+  res.json({ success: true });
+});
+
 module.exports = router;

@@ -83,6 +83,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('warnings')
     .setDescription('List all warnings for the specified user')
+    .setDMPermission(false)
     .addUserOption(option =>
       option.setName('user')
         .setDescription('The user to check warnings for')

@@ -13,10 +13,25 @@
       opacity: 0.6;
     }
     .category-header {
-      position: sticky;
-      top: 0;
-      z-index: 10;
-      background: rgb(9 9 11);
+      cursor: pointer;
+      user-select: none;
+    }
+    .category-header:hover {
+      background-color: rgba(255,255,255,0.03);
+    }
+    .category-content {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease-out;
+    }
+    .category-content.open {
+      max-height: 3000px;
+    }
+    .chevron {
+      transition: transform 0.2s ease;
+    }
+    .chevron.open {
+      transform: rotate(180deg);
     }
   </style>
 </head>
@@ -199,22 +214,23 @@
         section.className = 'bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden';
         
         section.innerHTML = `
-          <div class="category-header p-4 border-b border-zinc-800 bg-zinc-900">
-            <div class="flex items-center justify-between">
-              <div class="flex items-center gap-3">
-                <span class="text-2xl">${info.icon}</span>
-                <div>
-                  <h3 class="font-semibold">${info.name}</h3>
-                  <p class="text-xs text-zinc-500">${info.description}</p>
-                </div>
-              </div>
-              <div class="flex items-center gap-2">
-                <button type="button" onclick="toggleCategory('${category}', true)" class="text-xs bg-green-600/20 text-green-400 hover:bg-green-600/30 px-2 py-1 rounded transition">Enable All</button>
-                <button type="button" onclick="toggleCategory('${category}', false)" class="text-xs bg-red-600/20 text-red-400 hover:bg-red-600/30 px-2 py-1 rounded transition">Disable All</button>
+          <div class="category-header p-4 border-b border-zinc-800 bg-zinc-900 flex items-center justify-between" onclick="toggleCategoryCollapse('${category}')">
+            <div class="flex items-center gap-3">
+              <span class="text-2xl">${info.icon}</span>
+              <div>
+                <h3 class="font-semibold">${info.name}</h3>
+                <p class="text-xs text-zinc-500">${info.description}</p>
               </div>
             </div>
+            <div class="flex items-center gap-2">
+              <button type="button" onclick="event.stopPropagation(); toggleCategoryCommands('${category}', true)" class="text-xs bg-green-600/20 text-green-400 hover:bg-green-600/30 px-2 py-1 rounded transition">Enable All</button>
+              <button type="button" onclick="event.stopPropagation(); toggleCategoryCommands('${category}', false)" class="text-xs bg-red-600/20 text-red-400 hover:bg-red-600/30 px-2 py-1 rounded transition">Disable All</button>
+              <svg class="w-5 h-5 chevron open" id="chevron-${category}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+              </svg>
+            </div>
           </div>
-          <div class="p-4 grid gap-3" id="category-${category}">
+          <div class="category-content open p-4 grid gap-3" id="category-${category}">
             ${commands.map(cmd => {
               const isEnabled = !disabledCommands.includes(cmd.name);
               totalCommands++;
@@ -245,7 +261,7 @@
           </div>
           <label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
             <input type="checkbox" class="sr-only peer command-toggle" data-command="${cmd.name}" ${isEnabled ? 'checked' : ''} onchange="toggleCommand('${cmd.name}', this.checked)">
-            <div class="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+            <div class="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
           </label>
         </div>
       `;
@@ -267,7 +283,14 @@
       updateCommandCount();
     }
 
-    function toggleCategory(category, enable) {
+    function toggleCategoryCollapse(category) {
+      const content = document.getElementById(`category-${category}`);
+      const chevron = document.getElementById(`chevron-${category}`);
+      content.classList.toggle('open');
+      chevron.classList.toggle('open');
+    }
+
+    function toggleCategoryCommands(category, enable) {
       const commands = allCommands[category] || [];
       commands.forEach(cmd => {
         const checkbox = document.querySelector(`input[data-command="${cmd.name}"]`);
@@ -279,11 +302,11 @@
     }
 
     function enableAllCommands() {
-      publicCategories.forEach(cat => toggleCategory(cat, true));
+      publicCategories.forEach(cat => toggleCategoryCommands(cat, true));
     }
 
     function disableAllCommands() {
-      publicCategories.forEach(cat => toggleCategory(cat, false));
+      publicCategories.forEach(cat => toggleCategoryCommands(cat, false));
     }
 
     function updateCommandCount() {

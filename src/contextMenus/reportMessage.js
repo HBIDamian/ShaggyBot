@@ -7,7 +7,8 @@ const logger = createLogger('ReportMessage');
 module.exports = {
   data: new ContextMenuCommandBuilder()
     .setName('Report Message')
-    .setType(ApplicationCommandType.Message),
+    .setType(ApplicationCommandType.Message)
+    .setDMPermission(false),
   
   async execute(interaction) {
     const message = interaction.targetMessage;

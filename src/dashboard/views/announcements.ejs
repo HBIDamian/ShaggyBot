@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title: title }) %>
+</head>
+<body class="bg-zinc-950 text-white min-h-screen guild-page">
+  <%- include('partials/background') %>
+  <%- include('partials/navbar', { requiresAuth: true, activePage: 'dashboard' }) %>
+
+  <div class="flex min-h-[calc(100vh-65px)] relative z-10">
+    <%- include('partials/sidebar', { activeSection: 'announcements' }) %>
+
+    <!-- Main Content -->
+    <main class="flex-1 p-4 md:p-8 overflow-y-auto lg:ml-72">
+      <div class="max-w-3xl mx-auto">
+
+        <div class="mb-6 md:mb-8">
+          <h1 class="text-xl md:text-2xl font-bold mb-2">📣 Scheduled Announcements</h1>
+          <p class="text-zinc-400 text-sm md:text-base">Have the bot automatically send messages to any channel on a one-time or recurring schedule.</p>
+        </div>
+
+        <!-- CREATE NEW ANNOUNCEMENT -->
+        <div class="bg-zinc-900 p-6 rounded-xl border border-zinc-800 mb-6">
+          <h3 class="font-semibold text-lg mb-4">➕ Create New Announcement</h3>
+          <form id="createForm" class="space-y-4">
+
+            <!-- Channel -->
+            <div>
+              <label class="block text-sm font-medium mb-1.5">Channel <span class="text-red-400">*</span></label>
+              <select id="new_channel_id" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 focus:outline-none focus:border-indigo-500 transition channel-select" required>
+                <option value="">Select a channel…</option>
+              </select>
+            </div>
+
+            <!-- Message -->
+            <div>
+              <label class="block text-sm font-medium mb-1.5">Message</label>
+              <textarea id="new_message" rows="3" placeholder="Message content (optional if using an embed)"
+                class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 focus:outline-none focus:border-indigo-500 transition resize-none text-sm"></textarea>
+            </div>
+
+            <!-- Embed toggle -->
+            <div>
+              <label class="flex items-center gap-3 cursor-pointer select-none">
+                <input type="checkbox" id="new_embed_enabled" class="sr-only peer" onchange="toggleEmbedFields()">
+                <div class="w-11 h-6 bg-zinc-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600 relative"></div>
+                <span class="text-sm font-medium">Include an embed</span>
+              </label>
+            </div>
+
+            <!-- Embed fields (hidden by default) -->
+            <div id="embedFields" class="hidden bg-zinc-800/40 rounded-xl p-4 space-y-3 border border-zinc-700">
+              <p class="text-xs text-zinc-500 font-medium uppercase tracking-wide mb-2">Embed Options</p>
+              <div>
+                <label class="block text-sm font-medium mb-1">Embed Title</label>
+                <input type="text" id="new_embed_title" placeholder="e.g. 📢 Weekly Announcement"
+                  class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500 transition text-sm">
+              </div>
+              <div>
+                <label class="block text-sm font-medium mb-1">Embed Description</label>
+                <textarea id="new_embed_description" rows="3" placeholder="Main body of the embed…"
+                  class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500 transition resize-none text-sm"></textarea>
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-sm font-medium mb-1">Color (hex)</label>
+                  <input type="text" id="new_embed_color" placeholder="#5865F2"
+                    class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500 transition text-sm">
+                </div>
+                <div>
+                  <label class="block text-sm font-medium mb-1">Image URL</label>
+                  <input type="text" id="new_embed_image" placeholder="https://…"
+                    class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500 transition text-sm">
+                </div>
+              </div>
+            </div>
+
+            <!-- Schedule Type -->
+            <div>
+              <label class="block text-sm font-medium mb-1.5">Schedule Type <span class="text-red-400">*</span></label>
+              <select id="new_schedule_type" onchange="updateScheduleFields()" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 focus:outline-none focus:border-indigo-500 transition">
+                <option value="once">Once — fire at a specific date &amp; time</option>
+                <option value="daily">Daily — every day at a set time</option>
+                <option value="weekly">Weekly — on a specific day &amp; time</option>
+                <option value="interval">Interval — every N minutes</option>
+              </select>
+            </div>
+
+            <!-- Dynamic schedule fields -->
+            <div id="scheduleFields" class="space-y-3"></div>
+
+            <button type="submit" class="w-full px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 rounded-lg font-medium transition">
+              Create Announcement
+            </button>
+            <p id="createStatus" class="hidden text-sm text-center mt-1"></p>
+          </form>
+        </div>
+
+        <!-- EXISTING ANNOUNCEMENTS -->
+        <div class="bg-zinc-900 p-6 rounded-xl border border-zinc-800">
+          <h3 class="font-semibold text-lg mb-4">📋 Existing Announcements</h3>
+          <div id="announcementList">
+            <p class="text-zinc-500 text-sm text-center py-6">Loading…</p>
+          </div>
+        </div>
+
+        <div class="h-20 md:hidden"></div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+    function onGuildReady(data) {
+      document.title = `Scheduled Announcements - ${data.name} - ShaggyBot`;
+      // Populate channel selects
+      document.querySelectorAll('.channel-select').forEach(select => {
+        data.channels.forEach(ch => {
+          const opt = document.createElement('option');
+          opt.value = ch.id;
+          opt.textContent = `#${ch.name}`;
+          select.appendChild(opt);
+        });
+      });
+      updateScheduleFields();
+      loadAnnouncements();
+    }
+
+    function toggleEmbedFields() {
+      const enabled = document.getElementById('new_embed_enabled').checked;
+      document.getElementById('embedFields').classList.toggle('hidden', !enabled);
+    }
+
+    function updateScheduleFields() {
+      const type = document.getElementById('new_schedule_type').value;
+      const container = document.getElementById('scheduleFields');
+      container.innerHTML = '';
+
+      if (type === 'once') {
+        container.innerHTML = `
+          <div>
+            <label class="block text-sm font-medium mb-1.5">Date &amp; Time <span class="text-red-400">*</span></label>
+            <input type="datetime-local" id="sched_run_at" required
+              class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 focus:outline-none focus:border-indigo-500 transition text-sm"
+              min="${new Date().toISOString().slice(0, 16)}">
+          </div>`;
+      } else if (type === 'daily') {
+        container.innerHTML = `
+          <div>
+            <label class="block text-sm font-medium mb-1.5">Time of Day <span class="text-red-400">*</span></label>
+            <input type="time" id="sched_run_at" required
+              class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 focus:outline-none focus:border-indigo-500 transition text-sm">
+          </div>`;
+      } else if (type === 'weekly') {
+        container.innerHTML = `
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium mb-1.5">Day of Week <span class="text-red-400">*</span></label>
+              <select id="sched_day_of_week" required class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 focus:outline-none focus:border-indigo-500 transition text-sm">
+                ${DAYS.map((d, i) => `<option value="${i}">${d}</option>`).join('')}
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-1.5">Time of Day <span class="text-red-400">*</span></label>
+              <input type="time" id="sched_run_at" required
+                class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 focus:outline-none focus:border-indigo-500 transition text-sm">
+            </div>
+          </div>`;
+      } else if (type === 'interval') {
+        container.innerHTML = `
+          <div>
+            <label class="block text-sm font-medium mb-1.5">Every <span class="text-red-400">*</span></label>
+            <div class="flex gap-3 items-center">
+              <input type="number" id="sched_interval_minutes" min="5" max="525600" placeholder="60" required
+                class="w-32 bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 focus:outline-none focus:border-indigo-500 transition text-sm">
+              <span class="text-zinc-400 text-sm">minutes (minimum 5)</span>
+            </div>
+          </div>`;
+      }
+    }
+
+    async function loadAnnouncements() {
+      const list = document.getElementById('announcementList');
+      try {
+        const res = await fetch(`/api/guilds/${guildId}/announcements`);
+        const items = await res.json();
+        if (!Array.isArray(items) || items.length === 0) {
+          list.innerHTML = '<p class="text-zinc-500 text-sm text-center py-6">No scheduled announcements yet. Create one above!</p>';
+          return;
+        }
+        list.innerHTML = '<div class="space-y-3">' + items.map(renderAnnouncement).join('') + '</div>';
+      } catch {
+        list.innerHTML = '<p class="text-red-400 text-sm text-center py-6">Failed to load announcements.</p>';
+      }
+    }
+
+    function scheduleDescription(a) {
+      if (a.schedule_type === 'once')     return `Once at ${formatDateTime(a.run_at)}`;
+      if (a.schedule_type === 'daily')    return `Daily at ${a.run_at || '?'}`;
+      if (a.schedule_type === 'weekly')   return `Every ${DAYS[a.day_of_week] ?? '?'} at ${a.run_at || '?'}`;
+      if (a.schedule_type === 'interval') return `Every ${a.interval_minutes} minute(s)`;
+      return a.schedule_type;
+    }
+
+    function formatDateTime(iso) {
+      if (!iso) return '?';
+      try { return new Date(iso).toLocaleString(); } catch { return iso; }
+    }
+
+    function renderAnnouncement(a) {
+      const enabled = !!a.enabled;
+      const badge   = enabled
+        ? '<span class="text-xs px-2 py-0.5 rounded-full bg-green-500/20 text-green-400">Enabled</span>'
+        : '<span class="text-xs px-2 py-0.5 rounded-full bg-zinc-700 text-zinc-400">Disabled</span>';
+
+      const preview = a.message
+        ? `<p class="text-xs text-zinc-400 truncate mt-0.5">${escapeHtml(a.message)}</p>`
+        : a.embed_json
+        ? `<p class="text-xs text-indigo-400 truncate mt-0.5">📌 Embed: ${escapeHtml(a.embed_json.title || 'Untitled embed')}</p>`
+        : '';
+
+      return `
+        <div class="border border-zinc-800 rounded-xl p-4 flex gap-4 items-start">
+          <div class="flex-1 min-w-0">
+            <div class="flex flex-wrap items-center gap-2 mb-1">
+              ${badge}
+              <span class="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300">${escapeHtml(scheduleDescription(a))}</span>
+              <span class="text-xs text-zinc-500">Next: ${formatDateTime(a.next_run_at)}</span>
+            </div>
+            ${preview}
+            ${a.last_run_at ? `<p class="text-xs text-zinc-600 mt-0.5">Last sent: ${formatDateTime(a.last_run_at)}</p>` : ''}
+          </div>
+          <div class="flex items-center gap-2 flex-shrink-0">
+            <!-- Toggle -->
+            <label class="relative inline-flex items-center cursor-pointer" title="${enabled ? 'Disable' : 'Enable'}">
+              <input type="checkbox" class="sr-only peer" ${enabled ? 'checked' : ''}
+                onchange="toggleAnnouncement(${a.id}, this.checked)">
+              <div class="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600 relative"></div>
+            </label>
+            <!-- Delete -->
+            <button onclick="deleteAnnouncement(${a.id})"
+              class="text-zinc-500 hover:text-red-400 transition text-lg leading-none px-1" title="Delete">🗑️</button>
+          </div>
+        </div>`;
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    async function toggleAnnouncement(id, enabled) {
+      try {
+        await fetch(`/api/guilds/${guildId}/announcements/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled: enabled ? 1 : 0 })
+        });
+      } catch {
+        loadAnnouncements();
+      }
+    }
+
+    async function deleteAnnouncement(id) {
+      if (!confirm('Delete this scheduled announcement? This cannot be undone.')) return;
+      try {
+        const res = await fetch(`/api/guilds/${guildId}/announcements/${id}`, { method: 'DELETE' });
+        if (res.ok) loadAnnouncements();
+      } catch {}
+    }
+
+    document.getElementById('createForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const status = document.getElementById('createStatus');
+      const type   = document.getElementById('new_schedule_type').value;
+
+      const data = {
+        channel_id:    document.getElementById('new_channel_id').value,
+        message:       document.getElementById('new_message').value.trim() || null,
+        schedule_type: type
+      };
+
+      const runAtEl = document.getElementById('sched_run_at');
+      if (runAtEl) {
+        data.run_at = (type === 'once')
+          ? new Date(runAtEl.value).toISOString()
+          : runAtEl.value;
+      }
+      const dayEl = document.getElementById('sched_day_of_week');
+      if (dayEl) data.day_of_week = parseInt(dayEl.value);
+      const intervalEl = document.getElementById('sched_interval_minutes');
+      if (intervalEl) data.interval_minutes = parseInt(intervalEl.value);
+
+      if (document.getElementById('new_embed_enabled').checked) {
+        const embedTitle = document.getElementById('new_embed_title').value.trim();
+        const embedDesc  = document.getElementById('new_embed_description').value.trim();
+        if (embedTitle || embedDesc) {
+          data.embed_json = {};
+          if (embedTitle) data.embed_json.title = embedTitle;
+          if (embedDesc)  data.embed_json.description = embedDesc;
+          const color = document.getElementById('new_embed_color').value.trim();
+          const image = document.getElementById('new_embed_image').value.trim();
+          if (color) data.embed_json.color = color;
+          if (image) data.embed_json.image = image;
+        }
+      }
+
+      if (!data.channel_id) {
+        status.textContent = '✗ Please select a channel.';
+        status.className = 'text-sm text-center mt-1 text-red-400';
+        status.classList.remove('hidden');
+        return;
+      }
+      if (!data.message && !data.embed_json) {
+        status.textContent = '✗ Please provide a message or enable an embed with content.';
+        status.className = 'text-sm text-center mt-1 text-red-400';
+        status.classList.remove('hidden');
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/guilds/${guildId}/announcements`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        if (!res.ok) throw new Error((await res.json()).error || 'Failed');
+
+        status.textContent = '✓ Announcement scheduled!';
+        status.className = 'text-sm text-center mt-1 text-green-400';
+        status.classList.remove('hidden');
+
+        document.getElementById('new_message').value = '';
+        document.getElementById('new_embed_enabled').checked = false;
+        toggleEmbedFields();
+        document.getElementById('new_schedule_type').value = 'once';
+        updateScheduleFields();
+        loadAnnouncements();
+      } catch (err) {
+        status.textContent = `✗ ${err.message}`;
+        status.className = 'text-sm text-center mt-1 text-red-400';
+        status.classList.remove('hidden');
+      }
+      setTimeout(() => status.classList.add('hidden'), 4000);
+    });
+  </script>
+  <%- include('partials/scripts/guild-loader') %>
+</body>
+</html>

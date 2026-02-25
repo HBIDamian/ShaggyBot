@@ -3,7 +3,8 @@ const { SlashCommandBuilder, EmbedBuilder , MessageFlags } = require('discord.js
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('server')
-    .setDescription('Display information about the current server'),
+    .setDescription('Display information about the current server')
+    .setDMPermission(false),
   
   async execute(interaction) {
     const guild = interaction.guild;

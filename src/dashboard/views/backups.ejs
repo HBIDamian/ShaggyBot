@@ -1,0 +1,130 @@
+<%- include('partials/head') %>
+<%- include('partials/navbar') %>
+
+<div class="flex h-screen pt-[65px]">
+  <%- include('partials/sidebar') %>
+
+  <main class="flex-1 overflow-y-auto bg-zinc-950 p-6 lg:ml-72 transition-all duration-300">
+    <div class="max-w-4xl mx-auto">
+      <div class="flex items-center justify-between mb-8">
+        <div>
+          <h1 class="text-3xl font-bold text-white mb-2">Server Backups</h1>
+          <p class="text-zinc-400">Export and import your server's roles, categories, and channels.</p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Export Card -->
+        <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+          <div class="flex items-center gap-4 mb-4">
+            <div class="w-12 h-12 rounded-lg bg-indigo-500/20 flex items-center justify-center text-indigo-400">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+              </svg>
+            </div>
+            <div>
+              <h2 class="text-xl font-bold text-white">Export Backup</h2>
+              <p class="text-sm text-zinc-400">Download a JSON file of your server.</p>
+            </div>
+          </div>
+          <p class="text-zinc-300 text-sm mb-6">
+            This will generate a JSON file containing your server's roles, categories, channels, and basic settings. Messages and members are not included.
+          </p>
+          <button id="exportBtn" class="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition flex items-center justify-center gap-2">
+            <span>Export to JSON</span>
+          </button>
+        </div>
+
+        <!-- Import Card -->
+        <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+          <div class="flex items-center gap-4 mb-4">
+            <div class="w-12 h-12 rounded-lg bg-red-500/20 flex items-center justify-center text-red-400">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+              </svg>
+            </div>
+            <div>
+              <h2 class="text-xl font-bold text-white">Import Backup</h2>
+              <p class="text-sm text-zinc-400">Restore your server from a JSON file.</p>
+            </div>
+          </div>
+          <p class="text-zinc-300 text-sm mb-6">
+            <strong class="text-red-400">Warning:</strong> This is a destructive action. It will create new roles and channels based on the backup file.
+          </p>
+          
+          <input type="file" id="importFile" accept=".json" class="hidden">
+          <button id="importBtn" class="w-full py-2 px-4 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition flex items-center justify-center gap-2">
+            <span>Select JSON File & Restore</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<%- include('partials/scripts/guild-loader') %>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const guildId = window.location.pathname.split('/')[2];
+    
+    const exportBtn = document.getElementById('exportBtn');
+    const importBtn = document.getElementById('importBtn');
+    const importFile = document.getElementById('importFile');
+
+    exportBtn.addEventListener('click', () => {
+      exportBtn.disabled = true;
+      exportBtn.innerHTML = '<span class="animate-spin">⏳</span> Generating...';
+      
+      window.location.href = `/api/guilds/${guildId}/backup/export`;
+      
+      setTimeout(() => {
+        exportBtn.disabled = false;
+        exportBtn.innerHTML = '<span>Export to JSON</span>';
+      }, 3000);
+    });
+
+    importBtn.addEventListener('click', () => {
+      importFile.click();
+    });
+
+    importFile.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      if (!confirm('Are you sure you want to restore this backup? This will create new roles and channels in your server.')) {
+        importFile.value = '';
+        return;
+      }
+
+      try {
+        const text = await file.text();
+        const json = JSON.parse(text);
+
+        importBtn.disabled = true;
+        importBtn.innerHTML = '<span class="animate-spin">⏳</span> Restoring...';
+
+        const response = await fetch(`/api/guilds/${guildId}/backup/import`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(json)
+        });
+
+        const result = await response.json();
+        if (response.ok) {
+          alert(result.message || 'Backup restoration started!');
+        } else {
+          alert(result.error || 'Failed to restore backup.');
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Invalid JSON file or error reading file.');
+      } finally {
+        importBtn.disabled = false;
+        importBtn.innerHTML = '<span>Select JSON File & Restore</span>';
+        importFile.value = '';
+      }
+    });
+  });
+</script>
+
+<%- include('partials/footer') %>

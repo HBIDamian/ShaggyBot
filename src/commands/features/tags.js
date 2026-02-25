@@ -37,6 +37,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('tags')
     .setDescription('Manage server tags')
+    .setDMPermission(false)
     .addSubcommand(sub =>
       sub.setName('list')
         .setDescription('List all tags in this server')

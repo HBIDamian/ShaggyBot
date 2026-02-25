@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Script to register slash commands with Discord
 require('dotenv').config();
-const { REST, Routes } = require('discord.js');
+const { REST, Routes, InteractionContextType, ApplicationIntegrationType } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
 const { createLogger } = require('./utils/logger');
@@ -62,9 +62,37 @@ async function deploy() {
   try {
     logger.info(`Deploying ${commands.length} commands...`);
 
+    // Translate the legacy dm_permission flag into Discord's new
+    // integration_types + contexts system (dm_permission is now deprecated
+    // and ignored by the API).
+    // NOTE: "User Install" must be enabled on the app's Installation page
+    // in the Discord Developer Portal for DM contexts to work.
+    // - GuildInstall: bot is installed to a server (classic)
+    // - UserInstall: bot is installed to a user's account (enables DMs)
+    // Contexts:
+    // - Guild (0): server channels
+    // - BotDM (1): DM with the bot itself
+    // - PrivateChannel (2): DM with another user / group DM (requires UserInstall)
+    const processedCommands = commands.map(cmd => {
+      const dmAllowed = cmd.dm_permission !== false;
+      
+      // Create a clean command object without the deprecated dm_permission
+      const { dm_permission, ...cleanCmd } = cmd;
+      
+      return {
+        ...cleanCmd,
+        integration_types: dmAllowed
+          ? [0, 1] // 0 = GuildInstall, 1 = UserInstall
+          : [0],
+        contexts: dmAllowed
+          ? [0, 1, 2] // 0 = Guild, 1 = BotDM, 2 = PrivateChannel
+          : [0],
+      };
+    });
+
     const data = await rest.put(
       Routes.applicationCommands(CLIENT_ID),
-      { body: commands }
+      { body: processedCommands }
     );
 
     logger.info(`Successfully deployed ${data.length} commands`);

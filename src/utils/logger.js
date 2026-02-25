@@ -4,8 +4,21 @@ const util = require('util');
 
 // Configuration
 const LOG_DIR = path.join(process.cwd(), 'logs');
-const MAX_LOG_FILES = 7; // Keep last 7 days of logs
+const MAX_LOG_FILES = 14; // Keep last 14 days of logs
 const LOG_LEVEL = process.env.LOG_LEVEL || 'info';
+
+// Month abbreviations for DD-Mon-YYYY filename format
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+/**
+ * Get today's date string in DD-Mon-YYYY format (e.g. 26-Feb-2026)
+ */
+function getDateString(date = new Date()) {
+  const dd  = String(date.getDate()).padStart(2, '0');
+  const mon = MONTHS[date.getMonth()];
+  const yyyy = date.getFullYear();
+  return `${dd}-${mon}-${yyyy}`;
+}
 
 // Log level priorities (higher = more important)
 const LOG_PRIORITIES = { debug: 0, info: 1, warn: 2, error: 3 };
@@ -46,11 +59,13 @@ function initializeLogging() {
  */
 function cleanupOldLogs() {
   try {
+    // Match DD-Mon-YYYY.log (e.g. 26-Feb-2026.log)
+    const LOG_FILE_RE = /^\d{2}-[A-Z][a-z]{2}-\d{4}\.log$/;
     const files = fs.readdirSync(LOG_DIR)
-      .filter(f => f.startsWith('shaggyLog-') && f.endsWith('.log'))
+      .filter(f => LOG_FILE_RE.test(f))
       .map(f => ({ name: f, path: path.join(LOG_DIR, f), mtime: fs.statSync(path.join(LOG_DIR, f)).mtime }))
       .sort((a, b) => b.mtime - a.mtime);
-    
+
     // Remove files beyond the limit
     files.slice(MAX_LOG_FILES).forEach(f => {
       try { fs.unlinkSync(f.path); } catch {}
@@ -63,16 +78,16 @@ function cleanupOldLogs() {
  * @returns {fs.WriteStream}
  */
 function getWriteStream() {
-  const today = new Date().toISOString().slice(0, 10);
-  
+  const today = getDateString();
+
   if (currentLogDate !== today) {
     // Close old stream if exists
     if (writeStream) {
       writeStream.end();
     }
-    
+
     currentLogDate = today;
-    currentLogFile = path.join(LOG_DIR, `shaggyLog-${today}.log`);
+    currentLogFile = path.join(LOG_DIR, `${today}.log`);
     writeStream = fs.createWriteStream(currentLogFile, { flags: 'a' });
     
     writeStream.on('error', (err) => {

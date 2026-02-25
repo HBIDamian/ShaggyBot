@@ -9,6 +9,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('roast')
     .setDescription('Roast a user')
+    .setDMPermission(true)
     .addUserOption(option => 
       option
         .setName('member')
@@ -49,17 +50,6 @@ module.exports = {
   },
   
   async execute(interaction) {
-    // Check if in a guild
-    if (!interaction.guild) {
-      return interaction.reply({ content: "This command can only be used in a server.", flags: MessageFlags.Ephemeral });
-    }
-    
-    // Check if has permission to send messages
-    const member = interaction.guild.members.cache.get(interaction.user.id);
-    if (!member.permissions.has('SendMessages')) {
-      return interaction.reply({ content: "You do not have permission to use this command.", flags: MessageFlags.Ephemeral });
-    }
-    
     await interaction.deferReply();
     
     // Load insults if needed

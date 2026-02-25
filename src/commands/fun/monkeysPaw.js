@@ -9,6 +9,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('monkeyspaw')
     .setDescription('Wish for something')
+    .setDMPermission(false)
     .addStringOption(option => 
       option
         .setName('wish')

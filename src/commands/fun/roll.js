@@ -4,6 +4,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('roll')
     .setDescription('Roll a die')
+    .setDMPermission(true)
     .addIntegerOption(option => 
       option
         .setName('sides')

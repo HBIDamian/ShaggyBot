@@ -4,7 +4,7 @@ const path = require('path');
 const { Client, Collection, GatewayIntentBits, Events, REST, Routes, ActivityType, EmbedBuilder } = require('discord.js');
 const { createLogger, closeLogger } = require('./utils/logger');
 const { startDashboard } = require('./dashboard/server');
-const { cleanupOldModActions, cleanupOldWarnings, getDueReminders, deleteReminderById } = require('./database/database');
+const { cleanupOldModActions, cleanupOldWarnings, getDueReminders, deleteReminderById, getDueAnnouncements, updateAnnouncement, deleteAnnouncement, computeNextRun } = require('./database/database');
 require('dotenv').config();
 
 // Setup logging
@@ -129,6 +129,7 @@ const STATUS_MESSAGES = ['Zoinks!', 'Groovy!', 'Scooby Snacks!', 'G-G-G-Ghosts!'
 const STATUS_INTERVAL = 15000; // 15 seconds
 const CLEANUP_INTERVAL = 60 * 60 * 1000; // 1 hour
 const REMINDER_CHECK_INTERVAL = 30000; // 30 seconds
+const ANNOUNCEMENT_CHECK_INTERVAL = 60000; // 1 minute
 
 let statusIndex = 0;
 
@@ -192,6 +193,63 @@ async function processReminders() {
   }
 }
 
+/**
+ * Process and send due scheduled announcements
+ */
+async function processAnnouncements() {
+  try {
+    const due = getDueAnnouncements();
+    for (const announcement of due) {
+      try {
+        const guild = client.guilds.cache.get(announcement.guild_id);
+        if (!guild) {
+          // Bot left guild — disable announcement
+          updateAnnouncement(announcement.id, announcement.guild_id, { enabled: 0 });
+          continue;
+        }
+
+        const channel = guild.channels.cache.get(announcement.channel_id)
+          || await guild.channels.fetch(announcement.channel_id).catch(() => null);
+
+        if (!channel) {
+          logger.warn(`Announcement #${announcement.id}: channel ${announcement.channel_id} not found in ${guild.name}`);
+        } else {
+          const payload = {};
+          if (announcement.message) payload.content = announcement.message;
+          if (announcement.embed_json) {
+            const { EmbedBuilder } = require('discord.js');
+            const e = announcement.embed_json;
+            const embed = new EmbedBuilder();
+            if (e.title)       embed.setTitle(e.title);
+            if (e.description) embed.setDescription(e.description);
+            if (e.color)       embed.setColor(e.color);
+            if (e.footer)      embed.setFooter(e.footer);
+            if (e.image)       embed.setImage(e.image);
+            if (e.thumbnail)   embed.setThumbnail(e.thumbnail);
+            payload.embeds = [embed];
+          }
+          await channel.send(payload);
+          logger.info(`Sent scheduled announcement #${announcement.id} in ${guild.name} #${channel.name}`);
+        }
+        // Update state after sending (or failing to find channel)
+        const now = new Date().toISOString();
+        if (announcement.schedule_type === 'once') {
+          // One-shot — disable after firing
+          updateAnnouncement(announcement.id, announcement.guild_id, { enabled: 0, last_run_at: now });
+        } else {
+          // Recurring — compute next run
+          const nextRunAt = computeNextRun(announcement);
+          updateAnnouncement(announcement.id, announcement.guild_id, { next_run_at: nextRunAt, last_run_at: now });
+        }
+      } catch (err) {
+        logger.error(`Failed to send announcement #${announcement.id}: ${err.message}`);
+      }
+    }
+  } catch (error) {
+    logger.error(`Error processing announcements: ${error.message}`);
+  }
+}
+
 // When the client is ready, run this code once
 client.once(Events.ClientReady, () => {
   logger.info(`Bot logged in as ${client.user.tag} (ID: ${client.user.id})`);
@@ -216,6 +274,10 @@ client.once(Events.ClientReady, () => {
 
   // Start reminder processing
   setInterval(processReminders, REMINDER_CHECK_INTERVAL);
+
+  // Start announcement processing
+  setInterval(processAnnouncements, ANNOUNCEMENT_CHECK_INTERVAL);
+  processAnnouncements(); // Run immediately on startup
 });
 
 // Global error handling

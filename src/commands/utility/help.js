@@ -43,6 +43,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('help')
     .setDescription('Shows all available commands')
+    .setDMPermission(true)
     .addStringOption(option => 
       option.setName('category')
         .setDescription('Get help for a specific category')

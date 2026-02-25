@@ -694,9 +694,6 @@ function initDatabase() {
       embed_description TEXT DEFAULT 'This channel is used to catch spam bots. Any messages sent here will result in automatic moderation action.',
       embed_image TEXT,
       embed_message_id TEXT,
-      dm_embed_title TEXT DEFAULT '🍯 Honeypot Triggered',
-      dm_embed_description TEXT DEFAULT 'You have been {action} from **{server}** for sending a message in a honeypot channel.',
-      dm_embed_footer TEXT DEFAULT 'If you believe this was a mistake, please contact the server administrators.',
       FOREIGN KEY (guild_id) REFERENCES guild_settings(guild_id) ON DELETE CASCADE
     )
   `);
@@ -709,10 +706,7 @@ function initDatabase() {
       { name: 'embed_description', type: "TEXT DEFAULT 'This channel is used to catch spam bots. Any messages sent here will result in automatic moderation action.'" },
       { name: 'embed_image', type: 'TEXT' },
       { name: 'embed_message_id', type: 'TEXT' },
-      { name: 'keep_channel_empty', type: 'INTEGER DEFAULT 1' },
-      { name: 'dm_embed_title', type: "TEXT DEFAULT '\uD83C\uDF6F Honeypot Triggered'" },
-      { name: 'dm_embed_description', type: "TEXT DEFAULT 'You have been {action} from **{server}** for sending a message in a honeypot channel.'" },
-      { name: 'dm_embed_footer', type: "TEXT DEFAULT 'If you believe this was a mistake, please contact the server administrators.'" }
+      { name: 'keep_channel_empty', type: 'INTEGER DEFAULT 1' }
     ];
     for (const col of honeypotNewCols) {
       if (!honeypotColumns.includes(col.name)) {
@@ -746,6 +740,46 @@ function initDatabase() {
       FOREIGN KEY (guild_id) REFERENCES guild_settings(guild_id) ON DELETE CASCADE
     )
   `);
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS scheduled_announcements (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      guild_id TEXT NOT NULL,
+      channel_id TEXT NOT NULL,
+      message TEXT,
+      embed_json TEXT,
+      schedule_type TEXT NOT NULL DEFAULT 'once',
+      run_at TEXT,
+      interval_minutes INTEGER,
+      day_of_week INTEGER,
+      next_run_at TEXT NOT NULL,
+      enabled INTEGER DEFAULT 1,
+      created_by TEXT,
+      last_run_at TEXT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  // Migration: add any columns that may be missing from a pre-existing table
+  const announcementColumns = db.prepare("PRAGMA table_info(scheduled_announcements)").all().map(c => c.name);
+  const announcementMigrations = [
+    { column: 'enabled',          sql: 'ALTER TABLE scheduled_announcements ADD COLUMN enabled INTEGER DEFAULT 1' },
+    { column: 'schedule_type',    sql: "ALTER TABLE scheduled_announcements ADD COLUMN schedule_type TEXT NOT NULL DEFAULT 'once'" },
+    { column: 'embed_json',       sql: 'ALTER TABLE scheduled_announcements ADD COLUMN embed_json TEXT' },
+    { column: 'interval_minutes', sql: 'ALTER TABLE scheduled_announcements ADD COLUMN interval_minutes INTEGER' },
+    { column: 'day_of_week',      sql: 'ALTER TABLE scheduled_announcements ADD COLUMN day_of_week INTEGER' },
+    { column: 'run_at',           sql: 'ALTER TABLE scheduled_announcements ADD COLUMN run_at TEXT' },
+    { column: 'next_run_at',      sql: "ALTER TABLE scheduled_announcements ADD COLUMN next_run_at TEXT DEFAULT CURRENT_TIMESTAMP" },
+    { column: 'created_by',       sql: 'ALTER TABLE scheduled_announcements ADD COLUMN created_by TEXT' },
+    { column: 'last_run_at',      sql: 'ALTER TABLE scheduled_announcements ADD COLUMN last_run_at TEXT' },
+    { column: 'created_at',       sql: "ALTER TABLE scheduled_announcements ADD COLUMN created_at TEXT DEFAULT CURRENT_TIMESTAMP" },
+  ];
+  for (const { column, sql } of announcementMigrations) {
+    if (!announcementColumns.includes(column)) {
+      db.exec(sql);
+      logger.info(`Migration: added column '${column}' to scheduled_announcements`);
+    }
+  }
 
   logger.info('Database initialized successfully');
 }
@@ -1126,6 +1160,39 @@ function clearUserWarnings(guildId, userId) {
     DELETE FROM warnings WHERE guild_id = ? AND user_id = ?
   `).run(guildId, userId);
   return result.changes;
+}
+
+/**
+ * Get all warnings for a guild (used for backup)
+ * @param {string} guildId - The guild ID
+ * @returns {Array} All warnings
+ */
+function getAllWarnings(guildId) {
+  return db.prepare(
+    'SELECT user_id, moderator_id, reason, created_at FROM warnings WHERE guild_id = ? ORDER BY created_at ASC'
+  ).all(guildId);
+}
+
+/**
+ * Bulk-insert warnings for a guild (used for restore)
+ * Preserves original user_id, moderator_id, reason, and created_at.
+ * @param {string} guildId - The guild ID
+ * @param {Array} warnings - Array of warning objects
+ * @returns {number} Number inserted
+ */
+function bulkInsertWarnings(guildId, warnings) {
+  if (!Array.isArray(warnings) || warnings.length === 0) return 0;
+  const insert = db.prepare(
+    'INSERT INTO warnings (guild_id, user_id, moderator_id, reason, created_at) VALUES (?, ?, ?, ?, ?)'
+  );
+  const insertMany = db.transaction((items) => {
+    for (const w of items) {
+      if (!w.user_id || !w.moderator_id) continue;
+      insert.run(guildId, w.user_id, w.moderator_id, w.reason || null, w.created_at || new Date().toISOString());
+    }
+  });
+  insertMany(warnings);
+  return warnings.length;
 }
 
 /**
@@ -1963,6 +2030,157 @@ function deleteReminderById(id) {
   return result.changes > 0;
 }
 
+// ==================== SCHEDULED ANNOUNCEMENTS ====================
+
+/**
+ * Compute the next run timestamp for an announcement
+ * @param {Object} data - Announcement data
+ * @returns {string} ISO datetime string for the next run
+ */
+function computeNextRun(data) {
+  const now = new Date();
+
+  if (data.schedule_type === 'once') {
+    return data.run_at;
+  }
+
+  if (data.schedule_type === 'interval') {
+    const next = new Date(now.getTime() + (data.interval_minutes || 60) * 60000);
+    return next.toISOString();
+  }
+
+  if (data.schedule_type === 'daily') {
+    // run_at is "HH:MM"
+    const [hours, minutes] = (data.run_at || '09:00').split(':').map(Number);
+    const next = new Date(now);
+    next.setHours(hours, minutes, 0, 0);
+    if (next <= now) next.setDate(next.getDate() + 1);
+    return next.toISOString();
+  }
+
+  if (data.schedule_type === 'weekly') {
+    // day_of_week 0-6, run_at is "HH:MM"
+    const [hours, minutes] = (data.run_at || '09:00').split(':').map(Number);
+    const target = data.day_of_week ?? 1;
+    const next = new Date(now);
+    next.setHours(hours, minutes, 0, 0);
+    const diff = (target - next.getDay() + 7) % 7 || 7;
+    next.setDate(next.getDate() + diff);
+    return next.toISOString();
+  }
+
+  return new Date(now.getTime() + 3600000).toISOString();
+}
+
+/**
+ * Create a new scheduled announcement
+ * @param {string} guildId
+ * @param {Object} data
+ * @returns {Object} The created announcement
+ */
+function createAnnouncement(guildId, data) {
+  const nextRunAt = computeNextRun(data);
+  const result = db.prepare(`
+    INSERT INTO scheduled_announcements
+      (guild_id, channel_id, message, embed_json, schedule_type, run_at, interval_minutes, day_of_week, next_run_at, enabled, created_by)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+  `).run(
+    guildId,
+    data.channel_id,
+    data.message || null,
+    data.embed_json ? JSON.stringify(data.embed_json) : null,
+    data.schedule_type || 'once',
+    data.run_at || null,
+    data.interval_minutes || null,
+    data.day_of_week ?? null,
+    nextRunAt,
+    data.created_by || null
+  );
+  return getAnnouncementById(result.lastInsertRowid, guildId);
+}
+
+/**
+ * Get all announcements for a guild
+ * @param {string} guildId
+ * @returns {Array}
+ */
+function getAnnouncements(guildId) {
+  const rows = db.prepare(
+    'SELECT * FROM scheduled_announcements WHERE guild_id = ? ORDER BY next_run_at ASC'
+  ).all(guildId);
+  return rows.map(r => {
+    if (r.embed_json) r.embed_json = JSON.parse(r.embed_json);
+    return r;
+  });
+}
+
+/**
+ * Get a single announcement by id (scoped to guild)
+ * @param {number} id
+ * @param {string} guildId
+ * @returns {Object|null}
+ */
+function getAnnouncementById(id, guildId) {
+  const row = db.prepare(
+    'SELECT * FROM scheduled_announcements WHERE id = ? AND guild_id = ?'
+  ).get(id, guildId);
+  if (!row) return null;
+  if (row.embed_json) row.embed_json = JSON.parse(row.embed_json);
+  return row;
+}
+
+/**
+ * Update an announcement
+ * @param {number} id
+ * @param {string} guildId
+ * @param {Object} updates
+ * @returns {Object|null}
+ */
+function updateAnnouncement(id, guildId, updates) {
+  const allowedFields = [
+    'channel_id', 'message', 'embed_json', 'schedule_type',
+    'run_at', 'interval_minutes', 'day_of_week', 'next_run_at', 'enabled', 'last_run_at'
+  ];
+  const fields = Object.keys(updates).filter(k => allowedFields.includes(k));
+  if (fields.length === 0) return null;
+
+  const processedUpdates = { ...updates };
+  if (processedUpdates.embed_json && typeof processedUpdates.embed_json === 'object') {
+    processedUpdates.embed_json = JSON.stringify(processedUpdates.embed_json);
+  }
+
+  const setClause = fields.map(f => `${f} = ?`).join(', ');
+  const values = [...fields.map(f => processedUpdates[f]), id, guildId];
+  db.prepare(`UPDATE scheduled_announcements SET ${setClause} WHERE id = ? AND guild_id = ?`).run(...values);
+  return getAnnouncementById(id, guildId);
+}
+
+/**
+ * Delete an announcement
+ * @param {number} id
+ * @param {string} guildId
+ * @returns {boolean}
+ */
+function deleteAnnouncement(id, guildId) {
+  const result = db.prepare('DELETE FROM scheduled_announcements WHERE id = ? AND guild_id = ?').run(id, guildId);
+  return result.changes > 0;
+}
+
+/**
+ * Get all enabled announcements that are due (next_run_at <= now)
+ * @returns {Array}
+ */
+function getDueAnnouncements() {
+  const now = new Date().toISOString();
+  const rows = db.prepare(
+    "SELECT * FROM scheduled_announcements WHERE enabled = 1 AND next_run_at <= ?"
+  ).all(now);
+  return rows.map(r => {
+    if (r.embed_json) r.embed_json = JSON.parse(r.embed_json);
+    return r;
+  });
+}
+
 /**
  * Get command toggle settings for a guild
  * @param {string} guildId - The guild ID
@@ -2039,8 +2257,7 @@ function updateHoneypotSettings(guildId, updates) {
   const allowedFields = [
     'enabled', 'honeypot_channel_id', 'log_channel_id',
     'action', 'dm_user', 'delete_messages', 'keep_channel_empty',
-    'embed_title', 'embed_description', 'embed_image', 'embed_message_id',
-    'dm_embed_title', 'dm_embed_description', 'dm_embed_footer'
+    'embed_title', 'embed_description', 'embed_image', 'embed_message_id'
   ];
   
   getHoneypotSettings(guildId);
@@ -2087,6 +2304,8 @@ module.exports = {
   getWarningCount,
   deleteWarning,
   clearUserWarnings,
+  getAllWarnings,
+  bulkInsertWarnings,
   scheduleTempban,
   removeTempban,
   getPendingTempbans,
@@ -2146,5 +2365,13 @@ module.exports = {
   isCommandDisabled,
   // Honeypot
   getHoneypotSettings,
-  updateHoneypotSettings
+  updateHoneypotSettings,
+  // Scheduled Announcements
+  computeNextRun,
+  createAnnouncement,
+  getAnnouncements,
+  getAnnouncementById,
+  updateAnnouncement,
+  deleteAnnouncement,
+  getDueAnnouncements
 };

@@ -8,6 +8,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('lockdown')
     .setDescription('Lock or unlock configured channels during emergencies')
+    .setDMPermission(false)
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
     .addSubcommand(subcommand =>
       subcommand

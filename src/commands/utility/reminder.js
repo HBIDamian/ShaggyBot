@@ -76,6 +76,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('reminder')
     .setDescription('Set personal reminders that will be sent to you via DM')
+    .setDMPermission(true)
     .addSubcommand(subcommand =>
       subcommand
         .setName('create')

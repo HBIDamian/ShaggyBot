@@ -26,6 +26,9 @@
       <a href="#" onclick="navigateTo('/commandtoggles'); return false;" class="sidebar-link flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition <%= typeof activeSection !== 'undefined' && activeSection === 'commandtoggles' ? 'bg-indigo-600 text-white font-medium' : 'text-zinc-400 hover:bg-zinc-800 hover:text-white' %>">
         <span>🎚️</span> Command Toggles
       </a>
+      <a href="#" onclick="navigateTo('/backup'); return false;" class="sidebar-link flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition <%= typeof activeSection !== 'undefined' && activeSection === 'backup' ? 'bg-indigo-600 text-white font-medium' : 'text-zinc-400 hover:bg-zinc-800 hover:text-white' %>">
+        <span>💾</span> Backup & Restore
+      </a>
     </nav>
   </div>
 
@@ -69,6 +72,9 @@
       </a>
       <a href="#" onclick="navigateTo('/trolldiscourager'); return false;" class="sidebar-link flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition <%= typeof activeSection !== 'undefined' && activeSection === 'trolldiscourager' ? 'bg-indigo-600 text-white font-medium' : 'text-zinc-400 hover:bg-zinc-800 hover:text-white' %>">
         <span>🤡</span> Troll Discourager
+      </a>
+      <a href="#" onclick="navigateTo('/announcements'); return false;" class="sidebar-link flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition <%= typeof activeSection !== 'undefined' && activeSection === 'announcements' ? 'bg-indigo-600 text-white font-medium' : 'text-zinc-400 hover:bg-zinc-800 hover:text-white' %>">
+        <span>📣</span> Scheduled Announcements
       </a>
     </nav>
   </div>

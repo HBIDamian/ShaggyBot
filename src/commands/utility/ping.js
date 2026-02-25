@@ -3,7 +3,8 @@ const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('ping')
-    .setDescription('Check the bot\'s latency'),
+    .setDescription('Check the bot\'s latency')
+    .setDMPermission(true),
   
   async execute(interaction) {
     const latency = Math.round(interaction.client.ws.ping);

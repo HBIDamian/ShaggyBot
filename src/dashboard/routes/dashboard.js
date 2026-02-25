@@ -31,7 +31,9 @@ const GUILD_PAGES = [
   { path: '/starboard', view: 'starboard', title: 'Starboard', section: 'starboard' },
   { path: '/antiraid', view: 'antiraid', title: 'Anti-Raid', section: 'antiraid' },
   { path: '/lockdown', view: 'lockdown', title: 'Lockdown', section: 'lockdown' },
-  { path: '/honeypot', view: 'honeypot', title: 'Honeypot', section: 'honeypot' }
+  { path: '/honeypot', view: 'honeypot', title: 'Honeypot', section: 'honeypot' },
+  { path: '/announcements', view: 'announcements', title: 'Scheduled Announcements', section: 'announcements' },
+  { path: '/backup', view: 'backup', title: 'Server Backup & Restore', section: 'backup' }
 ];
 
 /**

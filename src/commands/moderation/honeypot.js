@@ -8,6 +8,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('honeypot')
     .setDescription('Configure honeypot channel to automatically catch and ban spam bots')
+    .setDMPermission(false)
     .addSubcommand(subcommand =>
       subcommand
         .setName('setup')

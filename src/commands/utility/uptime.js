@@ -3,7 +3,8 @@ const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('uptime')
-    .setDescription('Shows the bot\'s uptime'),
+    .setDescription('Shows the bot\'s uptime')
+    .setDMPermission(true),
   
   async execute(interaction) {
     // Calculate uptime

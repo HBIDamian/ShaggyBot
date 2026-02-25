@@ -7,7 +7,8 @@ const logger = createLogger('ReportUser');
 module.exports = {
   data: new ContextMenuCommandBuilder()
     .setName('Report User')
-    .setType(ApplicationCommandType.User),
+    .setType(ApplicationCommandType.User)
+    .setDMPermission(false),
   
   async execute(interaction) {
     const targetUser = interaction.targetUser;

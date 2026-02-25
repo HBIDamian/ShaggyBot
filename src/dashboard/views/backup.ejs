@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title: title }) %>
+</head>
+<body class="bg-zinc-950 text-white min-h-screen guild-page">
+  <%- include('partials/background') %>
+  <%- include('partials/navbar', { requiresAuth: true, activePage: 'dashboard' }) %>
+
+  <div class="flex min-h-[calc(100vh-65px)] relative z-10">
+    <%- include('partials/sidebar', { activeSection: 'backup' }) %>
+
+    <!-- Main Content -->
+    <main class="flex-1 p-4 md:p-8 overflow-y-auto lg:ml-72">
+      <div class="max-w-3xl mx-auto">
+        <div class="mb-6 md:mb-8">
+          <h1 class="text-xl md:text-2xl font-bold mb-2">💾 Backup &amp; Restore</h1>
+          <p class="text-zinc-400 text-sm md:text-base">Export ShaggyBot's settings for this server as a JSON file, or import a previously exported backup to restore them.</p>
+        </div>
+
+        <!-- ═══════════════ EXPORT SECTION ═══════════════ -->
+        <div class="bg-zinc-900 p-6 rounded-xl border border-zinc-800 mb-6">
+          <h3 class="font-semibold text-lg mb-1">📤 Export Backup</h3>
+          <p class="text-sm text-zinc-400 mb-4">Choose what to include in the export, then download. Includes both ShaggyBot settings and live Discord server structure (roles, channels, etc.).</p>
+
+          <!-- Section toggles -->
+          <div class="mb-3 flex items-center gap-3 text-xs text-zinc-500">
+            <span class="font-medium text-zinc-400">Include:</span>
+            <button type="button" onclick="setAllExport(true)"  class="underline hover:text-white transition">Select all</button>
+            <span>·</span>
+            <button type="button" onclick="setAllExport(false)" class="underline hover:text-white transition">Deselect all</button>
+          </div>
+
+          <div id="exportSections" class="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-5">
+            <!-- Rendered by JS -->
+          </div>
+
+          <div class="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 mb-2 flex gap-2 text-xs text-amber-300">
+            <span class="flex-shrink-0">⚠️</span>
+            <span><strong>Warnings</strong> are excluded by default as they can be very large. Enable the toggle above to include them.</span>
+          </div>
+
+          <div class="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 mb-4 flex gap-2 text-xs text-blue-300">
+            <span class="flex-shrink-0">ℹ️</span>
+            <span><strong>Discord Server</strong> sections (Roles, Channels) capture the live structure of your server at export time. They are not required to restore bot settings.</span>
+          </div>
+
+          <button id="exportBtn" class="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 rounded-lg font-medium transition disabled:opacity-50">
+            <span id="exportIcon">📥</span>
+            <span id="exportText">Download Backup</span>
+          </button>
+          <p id="exportStatus" class="hidden text-xs mt-2"></p>
+        </div>
+
+        <!-- ═══════════════ IMPORT / RESTORE SECTION ═══════════════ -->
+        <div class="bg-zinc-900 p-6 rounded-xl border border-zinc-800">
+          <h3 class="font-semibold text-lg mb-1">📥 Restore from Backup</h3>
+          <p class="text-sm text-zinc-400 mb-4">Select a previously exported <code class="bg-zinc-800 px-1 rounded">.json</code> backup file. Choose which sections to restore, then confirm.</p>
+
+          <!-- Danger callout -->
+          <div class="bg-red-500/10 border border-red-500/30 rounded-lg p-3 mb-2 flex gap-2 text-sm">
+            <span class="text-red-400 flex-shrink-0">⚠️</span>
+            <span class="text-red-300">Only the sections you select below will be overwritten. Sections not present in the backup file or deselected here will <strong>not</strong> be touched.</span>
+          </div>
+
+          <!-- Discord-specific warning -->
+          <div class="bg-orange-500/10 border border-orange-500/30 rounded-lg p-3 mb-4 flex gap-2 text-xs text-orange-300">
+            <span class="flex-shrink-0">🔷</span>
+            <span><strong>Discord sections</strong> (Roles &amp; Channels) will create or update server structure via the Discord API. This cannot be undone — roles may be created, colours and permissions changed, and channels added or edited.</span>
+          </div>
+
+          <!-- File drop zone -->
+          <div id="dropZone"
+               class="border-2 border-dashed border-zinc-700 hover:border-indigo-500 rounded-xl p-8 text-center cursor-pointer transition-colors mb-4"
+               onclick="document.getElementById('backupFileInput').click()"
+               ondragover="handleDragOver(event)"
+               ondragleave="handleDragLeave(event)"
+               ondrop="handleDrop(event)">
+            <p class="text-zinc-400 text-sm mb-1">Drag &amp; drop a backup file here, or <span class="text-indigo-400 underline">click to browse</span></p>
+            <p class="text-zinc-600 text-xs">Only <code class="bg-zinc-800 px-1 rounded">.json</code> files exported by ShaggyBot are accepted</p>
+          </div>
+          <input type="file" id="backupFileInput" accept=".json" class="hidden" onchange="handleFileSelect(event)">
+
+          <!-- Selected file info -->
+          <div id="fileInfo" class="hidden bg-zinc-800/60 rounded-lg p-3 mb-4 flex items-center gap-3">
+            <span class="text-2xl">📄</span>
+            <div class="flex-1 min-w-0">
+              <p id="fileName" class="font-medium text-sm truncate"></p>
+              <p id="fileDetails" class="text-xs text-zinc-400"></p>
+            </div>
+            <button onclick="clearFile()" class="text-zinc-500 hover:text-red-400 transition text-xl leading-none">&times;</button>
+          </div>
+
+          <!-- Per-section restore toggles (shown after file load) -->
+          <div id="restoreSectionsWrap" class="hidden mb-5">
+            <div class="flex items-center gap-3 text-xs text-zinc-500 mb-2">
+              <span class="font-medium text-zinc-400">Restore:</span>
+              <button type="button" onclick="setAllRestore(true)"  class="underline hover:text-white transition">Select all</button>
+              <span>·</span>
+              <button type="button" onclick="setAllRestore(false)" class="underline hover:text-white transition">Deselect all</button>
+            </div>
+            <div id="restoreSections" class="grid grid-cols-2 sm:grid-cols-3 gap-2"></div>
+            <p class="text-xs text-zinc-600 mt-2">Only sections present in the backup file are shown. Greyed items are missing from the file.</p>
+          </div>
+
+          <button id="restoreBtn" disabled
+                  class="flex items-center gap-2 px-5 py-2.5 bg-red-600 hover:bg-red-700 rounded-lg font-medium transition disabled:opacity-40 disabled:cursor-not-allowed">
+            <span id="restoreIcon">🔄</span>
+            <span id="restoreText">Restore Selected Sections</span>
+          </button>
+          <p id="restoreStatus" class="hidden text-sm mt-3 px-4 py-3 rounded-lg"></p>
+        </div>
+
+        <div class="h-20 md:hidden"></div>
+      </div>
+    </main>
+  </div>
+
+  <!-- ═══════════════ RESTORE PROGRESS MODAL ═══════════════ -->
+  <div id="progressModal"
+       class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+    <div class="bg-zinc-900 border border-zinc-700 rounded-2xl shadow-2xl w-full max-w-md p-6">
+      <!-- Header -->
+      <div class="flex items-center gap-3 mb-5">
+        <svg id="modalSpinner" class="animate-spin w-5 h-5 text-indigo-400 flex-shrink-0"
+             xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+        </svg>
+        <span id="modalTitle" class="font-semibold text-base">Restoring backup…</span>
+      </div>
+
+      <!-- Progress bar -->
+      <div class="bg-zinc-800 rounded-full h-2.5 mb-1 overflow-hidden">
+        <div id="progressBar"
+             class="h-2.5 rounded-full bg-indigo-500 transition-all duration-300 ease-out"
+             style="width:0%"></div>
+      </div>
+      <p id="progressLabel" class="text-xs text-zinc-500 mb-4">0 / 0 sections</p>
+
+      <!-- Section log -->
+      <div id="progressLog"
+           class="space-y-1 max-h-52 overflow-y-auto pr-1 text-sm">
+        <!-- items injected by JS -->
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ── Section definitions ──────────────────────────────────────────────────
+    // key:          used in query params and restore_sections array
+    // label:        display text
+    // group:        'settings' (bot.settings.*) | 'extra' (bot top-level array) | 'discord' (discord.*)
+    // discordKey:   for group=discord, the property inside backup.discord (e.g. 'guild_info')
+    // exportDefault: whether it's checked by default on the export panel
+    const SECTIONS = [
+      // ── Bot Settings ─────────────────────────────────────────────────────
+      { key: 'guild',             label: '⚙️ Bot Settings',       group: 'settings', exportDefault: true  },
+      { key: 'command_toggles',   label: '🎚️ Command Toggles',   group: 'settings', exportDefault: true  },
+      { key: 'automod',           label: '🤖 Auto-Mod',           group: 'settings', exportDefault: true  },
+      { key: 'moderation',        label: '🔨 Moderation',         group: 'settings', exportDefault: true  },
+      { key: 'anti_raid',         label: '🛡️ Anti-Raid',         group: 'settings', exportDefault: true  },
+      { key: 'audit_log',         label: '📋 Audit Log',          group: 'settings', exportDefault: true  },
+      { key: 'starboard',         label: '⭐ Starboard',          group: 'settings', exportDefault: true  },
+      { key: 'troll_discourager', label: '🤡 Troll Discourager',  group: 'settings', exportDefault: true  },
+      { key: 'honeypot',          label: '🍯 Honeypot',           group: 'settings', exportDefault: true  },
+      { key: 'tags',              label: '🏷️ Tags',              group: 'extra',    exportDefault: true  },
+
+      { key: 'warnings',          label: '⚠️ Warnings',          group: 'extra',    exportDefault: false },
+      // ── Discord Server ───────────────────────────────────────────────────
+      { key: 'discord_guild_info', label: '🏠 Server Info',       group: 'discord',  discordKey: 'guild_info', exportDefault: true  },
+      { key: 'discord_roles',      label: '🎭 Roles',             group: 'discord',  discordKey: 'roles',      exportDefault: true  },
+      { key: 'discord_channels',   label: '#️⃣ Channels',         group: 'discord',  discordKey: 'channels',   exportDefault: true  },
+    ];
+
+    let parsedBackup = null;
+
+    function onGuildReady(data) {
+      document.title = `Backup & Restore - ${data.name} - ShaggyBot`;
+      renderExportSections();
+    }
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+    /** Build a toggle checkbox item */
+    function buildToggle(key, label, checked, disabled = false) {
+      const disabledClass = disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:bg-zinc-800/70';
+      return `
+        <label class="flex items-center gap-2 px-3 py-2 rounded-lg bg-zinc-800/40 select-none ${disabledClass}" title="${disabled ? 'Not present in this backup' : ''}">
+          <input type="checkbox" class="section-toggle accent-indigo-500 w-4 h-4 flex-shrink-0"
+            data-key="${key}" ${checked ? 'checked' : ''} ${disabled ? 'disabled' : ''}>
+          <span class="text-sm truncate">${label}</span>
+        </label>`;
+    }
+
+    /** Checks whether a section has data in a backup object (v1 or v2) */
+    function sectionExistsInBackup(backup, key) {
+      const sec = SECTIONS.find(s => s.key === key);
+      if (!sec) return false;
+      const v2 = backup.version === 2;
+      // Discord group — lives in backup.discord.<discordKey>
+      if (sec.group === 'discord') {
+        if (!backup.discord) return false;
+        const val = backup.discord[sec.discordKey];
+        return Array.isArray(val) ? val.length > 0 : val != null;
+      }
+      // Bot settings: v2 → backup.bot.settings[key], v1 → backup.settings[key]
+      if (sec.group === 'settings') {
+        const settingsObj = v2 ? backup.bot?.settings : backup.settings;
+        return settingsObj?.[key] != null;
+      }
+      // Extra (top-level arrays): v2 → backup.bot[key], v1 → backup[key]
+      const container = v2 ? backup.bot : backup;
+      return Array.isArray(container?.[key]) && container[key].length > 0;
+    }
+
+    // ── Export section UI ─────────────────────────────────────────────────────
+    function renderExportSections() {
+      const botSections   = SECTIONS.filter(s => s.group !== 'discord');
+      const discordSections = SECTIONS.filter(s => s.group === 'discord');
+      document.getElementById('exportSections').innerHTML = `
+        <div class="col-span-full text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-1 mt-1">🤖 Bot Data</div>
+        ${botSections.map(s => buildToggle('export_' + s.key, s.label, s.exportDefault)).join('')}
+        <div class="col-span-full text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-1 mt-3 border-t border-zinc-700/50 pt-3">🔷 Discord Server</div>
+        ${discordSections.map(s => buildToggle('export_' + s.key, s.label, s.exportDefault)).join('')}
+      `;
+    }
+
+    function setAllExport(checked) {
+      document.querySelectorAll('#exportSections .section-toggle').forEach(el => { el.checked = checked; });
+    }
+
+    function getExportSections() {
+      return [...document.querySelectorAll('#exportSections .section-toggle')]
+        .filter(el => el.checked)
+        .map(el => el.dataset.key.replace('export_', ''));
+    }
+
+    // ── Export button ─────────────────────────────────────────────────────────
+    document.getElementById('exportBtn').addEventListener('click', async () => {
+      const sections = getExportSections();
+      if (sections.length === 0) {
+        const s = document.getElementById('exportStatus');
+        s.textContent = '✗ Select at least one section to export.';
+        s.className = 'text-xs mt-2 text-red-400';
+        s.classList.remove('hidden');
+        setTimeout(() => s.classList.add('hidden'), 3000);
+        return;
+      }
+
+      const btn  = document.getElementById('exportBtn');
+      const icon = document.getElementById('exportIcon');
+      const text = document.getElementById('exportText');
+      const status = document.getElementById('exportStatus');
+
+      btn.disabled = true;
+      icon.textContent = '⏳';
+      text.textContent = 'Preparing...';
+
+      try {
+        const url = `/api/guilds/${guildId}/backup?sections=${sections.join(',')}`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error((await res.json()).error || 'Export failed');
+
+        const blob = await res.blob();
+        const objUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const disposition = res.headers.get('Content-Disposition') || '';
+        const match = disposition.match(/filename="([^"]+)"/);
+        a.download = match ? match[1] : `shaggybot-backup-${guildId}-${Date.now()}.json`;
+        a.href = objUrl;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(objUrl);
+
+        status.textContent = `✓ Backup downloaded! (${sections.length} section(s))`;
+        status.className = 'text-xs mt-2 text-green-400';
+      } catch (err) {
+        status.textContent = `✗ ${err.message}`;
+        status.className = 'text-xs mt-2 text-red-400';
+      }
+
+      status.classList.remove('hidden');
+      icon.textContent = '📥';
+      text.textContent = 'Download Backup';
+      btn.disabled = false;
+      setTimeout(() => status.classList.add('hidden'), 4000);
+    });
+
+    // ── Drag & drop / file selection ──────────────────────────────────────────
+    function handleDragOver(e) {
+      e.preventDefault();
+      document.getElementById('dropZone').classList.add('border-indigo-500', 'bg-indigo-500/5');
+    }
+    function handleDragLeave(e) {
+      document.getElementById('dropZone').classList.remove('border-indigo-500', 'bg-indigo-500/5');
+    }
+    function handleDrop(e) {
+      e.preventDefault();
+      handleDragLeave(e);
+      const file = e.dataTransfer.files[0];
+      if (file) processFile(file);
+    }
+    function handleFileSelect(e) {
+      const file = e.target.files[0];
+      if (file) processFile(file);
+    }
+
+    function clearFile() {
+      parsedBackup = null;
+      document.getElementById('backupFileInput').value = '';
+      document.getElementById('fileInfo').classList.add('hidden');
+      document.getElementById('restoreSectionsWrap').classList.add('hidden');
+      document.getElementById('restoreBtn').disabled = true;
+      document.getElementById('restoreStatus').classList.add('hidden');
+    }
+
+    function processFile(file) {
+      if (!file.name.endsWith('.json')) {
+        showRestoreStatus('✗ Only .json backup files are accepted.', 'red');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = JSON.parse(e.target.result);
+          const v = data.version;
+          if (!v || (v !== 1 && v !== 2)) {
+            throw new Error('Not a valid ShaggyBot backup file');
+          }
+          if (v === 1 && !data.settings) throw new Error('v1 backup missing settings');
+          if (v === 2 && !data.bot)      throw new Error('v2 backup missing bot data');
+
+          parsedBackup = data;
+
+          // File info bar
+          document.getElementById('fileName').textContent = file.name;
+          document.getElementById('fileDetails').textContent =
+            `Exported ${new Date(data.exported_at).toLocaleString()} · From: ${data.guild_name || 'Unknown Server'}`;
+          document.getElementById('fileInfo').classList.remove('hidden');
+
+          // Render per-section restore toggles
+          renderRestoreSections(data);
+          document.getElementById('restoreSectionsWrap').classList.remove('hidden');
+          document.getElementById('restoreBtn').disabled = false;
+          document.getElementById('restoreStatus').classList.add('hidden');
+        } catch (err) {
+          showRestoreStatus(`✗ Invalid file: ${err.message}`, 'red');
+          clearFile();
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    // ── Restore section UI ────────────────────────────────────────────────────
+    function renderRestoreSections(backup) {
+      const botSections     = SECTIONS.filter(s => s.group !== 'discord');
+      const discordSections = SECTIONS.filter(s => s.group === 'discord');
+      document.getElementById('restoreSections').innerHTML = `
+        <div class="col-span-full text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-1 mt-1">🤖 Bot Data</div>
+        ${botSections.map(s => {
+          const exists = sectionExistsInBackup(backup, s.key);
+          return buildToggle('restore_' + s.key, s.label, exists, !exists);
+        }).join('')}
+        <div class="col-span-full text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-1 mt-3 border-t border-zinc-700/50 pt-3">🔷 Discord Server</div>
+        ${discordSections.map(s => {
+          const exists = sectionExistsInBackup(backup, s.key);
+          return buildToggle('restore_' + s.key, s.label, exists, !exists);
+        }).join('')}
+      `;
+    }
+
+    function setAllRestore(checked) {
+      document.querySelectorAll('#restoreSections .section-toggle:not(:disabled)').forEach(el => {
+        el.checked = checked;
+      });
+    }
+
+    function getRestoreSections() {
+      return [...document.querySelectorAll('#restoreSections .section-toggle')]
+        .filter(el => el.checked && !el.disabled)
+        .map(el => el.dataset.key.replace('restore_', ''));
+    }
+
+    function showRestoreStatus(message, color) {
+      const el = document.getElementById('restoreStatus');
+      el.textContent = message;
+      el.className = color === 'green'
+        ? 'text-sm mt-3 px-4 py-3 rounded-lg bg-green-500/20 text-green-400'
+        : 'text-sm mt-3 px-4 py-3 rounded-lg bg-red-500/20 text-red-400';
+      el.classList.remove('hidden');
+    }
+
+    // ── Restore progress modal helpers ────────────────────────────────────────    const SECTION_LABELS = Object.fromEntries(SECTIONS.map(s => [s.key, s.label]));
+
+    function openProgressModal(total) {
+      document.getElementById('progressModal').classList.remove('hidden');
+      document.getElementById('modalSpinner').classList.add('animate-spin');
+      document.getElementById('modalTitle').textContent = 'Restoring backup…';
+      document.getElementById('progressBar').style.width = '0%';
+      document.getElementById('progressLabel').textContent = `0 / ${total} sections`;
+      document.getElementById('progressLog').innerHTML = '';
+    }
+
+    function updateProgress(done, total) {
+      const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+      document.getElementById('progressBar').style.width = pct + '%';
+      document.getElementById('progressLabel').textContent = `${done} / ${total} sections`;
+    }
+
+    function logSection(key, status, message) {
+      const label = (SECTION_LABELS[key] || key).replace(/^\S+\s/, ''); // strip emoji
+      const icon  = status === 'ok' ? '✓' : '✗';
+      const color = status === 'ok' ? 'text-green-400' : 'text-red-400';
+      const row   = document.createElement('div');
+      row.className = `flex items-start gap-2 ${color}`;
+
+      const iconSpan = document.createElement('span');
+      iconSpan.className = 'flex-shrink-0 font-mono font-bold';
+      iconSpan.textContent = icon;
+
+      const textSpan = document.createElement('span');
+      textSpan.textContent = label;
+      if (message) {
+        const detail = document.createElement('span');
+        detail.className = 'text-zinc-500 text-xs';
+        detail.textContent = ` — ${message}`;
+        textSpan.appendChild(detail);
+      }
+
+      row.appendChild(iconSpan);
+      row.appendChild(textSpan);
+      const log = document.getElementById('progressLog');
+      log.appendChild(row);
+      log.scrollTop = log.scrollHeight;
+    }
+
+    function closeProgressModal(restored, failed) {
+      document.getElementById('modalSpinner').classList.remove('animate-spin');
+      const hasErrors = failed.length > 0;
+      document.getElementById('modalTitle').textContent =
+        hasErrors ? `Done — ${failed.length} section(s) failed` : 'Restore complete!';
+      // Auto-close after 2.5 s if everything succeeded, else leave open for review
+      if (!hasErrors) {
+        setTimeout(() => document.getElementById('progressModal').classList.add('hidden'), 2500);
+      } else {
+        // Add a close button
+        const btn = document.createElement('button');
+        btn.textContent = 'Dismiss';
+        btn.className = 'mt-4 w-full py-2 rounded-lg bg-zinc-700 hover:bg-zinc-600 text-sm transition';
+        btn.onclick = () => document.getElementById('progressModal').classList.add('hidden');
+        document.getElementById('progressLog').after(btn);
+      }
+    }
+
+    // ── Restore button ────────────────────────────────────────────────────────
+    document.getElementById('restoreBtn').addEventListener('click', async () => {
+      if (!parsedBackup) return;
+
+      const restore_sections = getRestoreSections();
+      if (restore_sections.length === 0) {
+        showRestoreStatus('✗ Select at least one section to restore.', 'red');
+        return;
+      }
+
+      const sectionList = restore_sections
+        .map(k => SECTIONS.find(s => s.key === k)?.label.replace(/^\S+\s/, '') || k)
+        .join(', ');
+
+      const confirmMsg =
+        `⚠️ You are about to restore the following sections:\n\n  ${sectionList}\n\n` +
+        `This will overwrite their current settings immediately and cannot be undone.\n\n` +
+        `Backup from: ${parsedBackup.guild_name || 'Unknown'} · Exported: ${new Date(parsedBackup.exported_at).toLocaleString()}\n\nProceed?`;
+      if (!confirm(confirmMsg)) return;
+
+      const btn  = document.getElementById('restoreBtn');
+      const icon = document.getElementById('restoreIcon');
+      const text = document.getElementById('restoreText');
+
+      btn.disabled = true;
+      icon.textContent = '⏳';
+      text.textContent = 'Restoring…';
+      document.getElementById('restoreStatus').classList.add('hidden');
+
+      try {
+        const response = await fetch(`/api/guilds/${guildId}/restore`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ backup: parsedBackup, restore_sections })
+        });
+
+        if (!response.ok) {
+          // Not SSE — likely a validation error returned as JSON
+          const err = await response.json().catch(() => ({ error: 'Restore failed' }));
+          throw new Error(err.error || 'Restore failed');
+        }
+
+        // Parse SSE stream manually using fetch + ReadableStream
+        const reader   = response.body.getReader();
+        const decoder  = new TextDecoder();
+        let buffer     = '';
+        let totalSections = restore_sections.length;
+        let modalOpen  = false;
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop(); // keep incomplete last line
+
+          let eventType = null;
+          let dataLine  = null;
+
+          for (const line of lines) {
+            if (line.startsWith('event: ')) {
+              eventType = line.slice(7).trim();
+            } else if (line.startsWith('data: ')) {
+              dataLine = line.slice(6).trim();
+            } else if (line === '' && eventType && dataLine) {
+              // Dispatch event
+              try {
+                const payload = JSON.parse(dataLine);
+
+                if (eventType === 'start') {
+                  totalSections = payload.total;
+                  openProgressModal(totalSections);
+                  modalOpen = true;
+                } else if (eventType === 'progress') {
+                  if (!modalOpen) { openProgressModal(totalSections); modalOpen = true; }
+                  updateProgress(payload.restored, payload.total);
+                  logSection(payload.section, payload.status, payload.message);
+                } else if (eventType === 'done') {
+                  updateProgress(payload.restored?.length ?? totalSections, totalSections);
+                  closeProgressModal(payload.restored || [], payload.failed || []);
+                  if ((payload.failed || []).length === 0) {
+                    showRestoreStatus(`✓ Restored ${(payload.restored || []).length} section(s) successfully.`, 'green');
+                    clearFile();
+                  } else {
+                    showRestoreStatus(`⚠️ Done with errors — ${payload.failed.length} section(s) failed. See details above.`, 'red');
+                  }
+                }
+              } catch (_) {}
+
+              eventType = null;
+              dataLine  = null;
+            }
+          }
+        }
+      } catch (err) {
+        showRestoreStatus(`✗ ${err.message}`, 'red');
+        document.getElementById('progressModal').classList.add('hidden');
+      }
+
+      icon.textContent = '🔄';
+      text.textContent = 'Restore Selected Sections';
+      btn.disabled = !parsedBackup;
+    });
+  </script>
+  <%- include('partials/scripts/guild-loader') %>
+</body>
+</html>

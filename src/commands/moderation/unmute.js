@@ -9,6 +9,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('unmute')
     .setDescription('Unmute the specified user (removes timeout)')
+    .setDMPermission(false)
     .addUserOption(option =>
       option.setName('user')
         .setDescription('The user to unmute')

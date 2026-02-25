@@ -5,6 +5,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('tag')
     .setDescription('Display a tag')
+    .setDMPermission(false)
     .addStringOption(option =>
       option.setName('name')
         .setDescription('The name of the tag to display')

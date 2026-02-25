@@ -59,21 +59,14 @@ module.exports = {
       // Try to DM the user first (if enabled)
       if (settings.dm_user) {
         try {
-          const DEFAULT_DM_TITLE   = '🍯 Honeypot Triggered';
-          const DEFAULT_DM_DESC    = 'You have been {action} from **{server}** for sending a message in a honeypot channel.';
-          const DEFAULT_DM_FOOTER  = 'If you believe this was a mistake, please contact the server administrators.';
-
-          const dmTitle  = settings.dm_embed_title       || DEFAULT_DM_TITLE;
-          const dmDesc   = (settings.dm_embed_description || DEFAULT_DM_DESC)
-            .replace(/\{action\}/g, getActionPastTense(action))
-            .replace(/\{server\}/g, message.guild.name);
-          const dmFooter = settings.dm_embed_footer      || DEFAULT_DM_FOOTER;
-
           const dmEmbed = new EmbedBuilder()
             .setColor(0xFF6B6B)
-            .setTitle(dmTitle)
-            .setDescription(dmDesc)
-            .setFooter({ text: dmFooter })
+            .setTitle('🍯 Honeypot Triggered')
+            .setDescription(`You have been ${getActionPastTense(action)} from **${message.guild.name}** for sending a message in a honeypot channel.`)
+            .addFields(
+              { name: 'What is a honeypot?', value: 'A honeypot is a trap channel designed to catch spam bots. Legitimate users should never send messages in these channels.' }
+            )
+            .setFooter({ text: 'If you believe this was a mistake, please contact the server administrators.' })
             .setTimestamp();
 
           await user.send({ embeds: [dmEmbed] });
@@ -122,10 +115,6 @@ module.exports = {
           if (member) {
             await member.kick(reason);
           }
-          break;
-
-        case 'nothing':
-          // No action, just log the event
           break;
           
         default:

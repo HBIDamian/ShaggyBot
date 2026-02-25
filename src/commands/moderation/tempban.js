@@ -13,6 +13,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('tempban')
     .setDescription('Temporarily ban a user for the specified duration')
+    .setDMPermission(false)
     .addUserOption(option =>
       option.setName('user')
         .setDescription('The user to tempban')
