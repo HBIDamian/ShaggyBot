@@ -12,6 +12,7 @@
 
 const { createLogger } = require('./logger');
 const { AppError, ErrorCodes } = require('./AppError');
+const { MessageFlags } = require('discord.js');
 
 const errorLogger = createLogger('ErrorHandler');
 
@@ -119,9 +120,10 @@ function asyncHandler(fn) {
  * @returns {Function} wrapped handler
  */
 function interactionHandler(fn) {
-  return async (interaction) => {
+  return async (...args) => {
+    const interaction = args[0];
     try {
-      await fn(interaction);
+      await fn(...args);
     } catch (err) {
       const ctx = {
         guildId: interaction.guildId,
@@ -133,9 +135,11 @@ function interactionHandler(fn) {
       handleError(err, ctx);
 
       // Reply to the interaction if it hasn't been acknowledged yet
-      const reply = err instanceof AppError && err.isOperational
-        ? { content: `❌ ${err.message}`, ephemeral: true }
-        : { content: '❌ An unexpected error occurred. Please try again later.', ephemeral: true };
+      const message = err instanceof AppError && err.isOperational
+        ? `❌ ${err.message}`
+        : '❌ An unexpected error occurred. Please try again later.';
+
+      const reply = { content: message, flags: MessageFlags.Ephemeral };
 
       try {
         if (interaction.deferred) {
