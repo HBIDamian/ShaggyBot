@@ -9,15 +9,15 @@ module.exports = {
     .setName('Report User')
     .setType(ApplicationCommandType.User)
     .setDMPermission(false),
-  
+
   async execute(interaction) {
     const targetUser = interaction.targetUser;
     const guild = interaction.guild;
     const reporter = interaction.user;
-    
+
     // Get moderation settings
     const modSettings = db.getModerationSettings(guild.id);
-    
+
     // Check if report feature is enabled
     if (!modSettings?.report_enabled) {
       return interaction.reply({
@@ -25,7 +25,7 @@ module.exports = {
         flags: MessageFlags.Ephemeral
       });
     }
-    
+
     // Check if report channel is configured
     if (!modSettings?.report_channel) {
       return interaction.reply({
@@ -33,7 +33,7 @@ module.exports = {
         flags: MessageFlags.Ephemeral
       });
     }
-    
+
     // Don't allow reporting yourself
     if (targetUser.id === reporter.id) {
       return interaction.reply({
@@ -41,7 +41,7 @@ module.exports = {
         flags: MessageFlags.Ephemeral
       });
     }
-    
+
     // Don't allow reporting bots
     if (targetUser.bot) {
       return interaction.reply({
@@ -49,12 +49,12 @@ module.exports = {
         flags: MessageFlags.Ephemeral
       });
     }
-    
+
     // Create the modal for reason input
     const modal = new ModalBuilder()
       .setCustomId(`report_user_modal_${targetUser.id}`)
       .setTitle('Reason');
-    
+
     const reasonInput = new TextInputBuilder()
       .setCustomId('report_reason')
       .setLabel('Reason')
@@ -62,13 +62,13 @@ module.exports = {
       .setStyle(TextInputStyle.Paragraph)
       .setRequired(true)
       .setMaxLength(1000);
-    
+
     const actionRow = new ActionRowBuilder().addComponents(reasonInput);
     modal.addComponents(actionRow);
-    
+
     await interaction.showModal(modal);
   },
-  
+
   /**
    * Handle the modal submission
    */
@@ -76,10 +76,10 @@ module.exports = {
     const guild = interaction.guild;
     const reporter = interaction.user;
     const reason = interaction.fields.getTextInputValue('report_reason');
-    
+
     // Get moderation settings again
     const modSettings = db.getModerationSettings(guild.id);
-    
+
     // Get the report channel
     const reportChannel = guild.channels.cache.get(modSettings.report_channel);
     if (!reportChannel) {
@@ -88,21 +88,21 @@ module.exports = {
         flags: MessageFlags.Ephemeral
       });
     }
-    
+
     // Fetch the target user
     let targetUser;
     try {
       targetUser = await interaction.client.users.fetch(targetUserId);
-    } catch (error) {
+    } catch (_error) {
       return interaction.reply({
         content: '❌ Could not find the reported user.',
         flags: MessageFlags.Ephemeral
       });
     }
-    
+
     // Create the report ID
     const reportId = `user_report_${Date.now()}_${targetUserId}`;
-    
+
     // Create the report embed
     const reportEmbed = new EmbedBuilder()
       .setColor(0xFF6B6B)
@@ -123,7 +123,7 @@ module.exports = {
         iconURL: reporter.displayAvatarURL({ dynamic: true })
       })
       .setTimestamp();
-    
+
     // Create action buttons
     const actionRow1 = new ActionRowBuilder()
       .addComponents(
@@ -140,7 +140,7 @@ module.exports = {
           .setLabel('Delete Report')
           .setStyle(ButtonStyle.Secondary)
       );
-    
+
     const actionRow2 = new ActionRowBuilder()
       .addComponents(
         new ButtonBuilder()
@@ -152,16 +152,16 @@ module.exports = {
           .setLabel('Mark Finished')
           .setStyle(ButtonStyle.Success)
       );
-    
+
     try {
       // Send the report to the report channel
       await reportChannel.send({
         embeds: [reportEmbed],
         components: [actionRow1, actionRow2]
       });
-      
+
       logger.info(`User reported in ${guild.name}: ${targetUser.tag} by ${reporter.tag}`);
-      
+
       return interaction.reply({
         content: '✅ Your report has been submitted. Thank you for helping keep this server safe!',
         flags: MessageFlags.Ephemeral

@@ -78,7 +78,7 @@ const PUNISHMENT_CONFIG = {
  */
 async function sendPunishmentNotification(options) {
   const { guild, user, moderator, type, reason, anonymous = false, extra = {} } = options;
-  
+
   const config = PUNISHMENT_CONFIG[type];
   if (!config) {
     logger.error(`Unknown punishment type: ${type}`);
@@ -87,14 +87,14 @@ async function sendPunishmentNotification(options) {
 
   // Get guild's notification settings
   const settings = db.getModerationSettings(guild.id);
-  
+
   // Check if this notification type is enabled
   const isEnabled = settings[config.settingKey] !== 0;
   if (!isEnabled) {
     logger.debug(`Notification for ${type} is disabled for guild ${guild.id}`);
     return { dmSent: false, channelSent: false, disabled: true };
   }
-  
+
   const mode = settings.punishment_notify_mode || 'dm_only';
   const channelId = settings.punishment_channel;
 
@@ -108,13 +108,13 @@ async function sendPunishmentNotification(options) {
 
   // Try to send DM if needed
   if (shouldSendDm) {
-    dmSent = await sendDmNotification(user, guild, moderator, config, reason, anonymous, extra);
+    dmSent = await sendDmNotification({ user, guild, moderator, config, reason, anonymous, extra });
   }
 
   // Send to channel if needed
   if (shouldSendChannel || (fallbackToChannel && !dmSent)) {
     if (channelId) {
-      channelSent = await sendChannelNotification(guild, channelId, user, moderator, config, reason, extra);
+      channelSent = await sendChannelNotification({ guild, channelId, user, moderator, config, reason, extra });
     }
   }
 
@@ -124,13 +124,13 @@ async function sendPunishmentNotification(options) {
 /**
  * Send DM notification to the user
  */
-async function sendDmNotification(user, guild, moderator, config, reason, anonymous, extra) {
+async function sendDmNotification({ user, guild, moderator, config, reason, anonymous, extra }) {
   try {
     const moderatorText = anonymous ? 'a moderator' : moderator.tag;
     let dmContent = `**${config.emoji} ${config.dmTitle(guild.name)}**\n`;
     dmContent += `**Reason:** ${reason}\n`;
     dmContent += `**Moderator:** ${moderatorText}`;
-    
+
     if (extra.duration) {
       dmContent += `\n**Duration:** ${extra.duration}`;
     }
@@ -149,7 +149,7 @@ async function sendDmNotification(user, guild, moderator, config, reason, anonym
 /**
  * Send notification to the punishment channel
  */
-async function sendChannelNotification(guild, channelId, user, moderator, config, reason, extra) {
+async function sendChannelNotification({ guild, channelId, user, moderator: _moderator, config, reason, extra }) {
   try {
     const channel = await guild.channels.fetch(channelId).catch(() => null);
     if (!channel || !channel.isTextBased()) {
@@ -159,9 +159,9 @@ async function sendChannelNotification(guild, channelId, user, moderator, config
 
     const embed = new EmbedBuilder()
       .setColor(config.color)
-      .setAuthor({ 
-        name: `${config.emoji} ${config.title}`, 
-        iconURL: user.displayAvatarURL({ dynamic: true, size: 64 }) 
+      .setAuthor({
+        name: `${config.emoji} ${config.title}`,
+        iconURL: user.displayAvatarURL({ dynamic: true, size: 64 })
       })
       .setThumbnail(user.displayAvatarURL({ dynamic: true, size: 128 }))
       .setDescription(`<@${user.id}> (${user.tag})`)
@@ -186,7 +186,7 @@ async function sendChannelNotification(guild, channelId, user, moderator, config
 
     // Build message components
     const components = [];
-    
+
     // Add revoke button if applicable
     if (config.revokeButton && config.revokeId) {
       const row = new ActionRowBuilder()

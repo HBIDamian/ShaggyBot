@@ -1,10 +1,12 @@
 const express = require('express');
 const session = require('express-session');
 const { Database } = require('bun:sqlite');
-const path = require('path');
-const fs = require('fs');
-const crypto = require('crypto');
-const { createLogger } = require('../utils/logger');
+const path = require('node:path');
+const fs = require('node:fs');
+const crypto = require('node:crypto');
+const { createLogger, requestContextMiddleware } = require('../utils/logger');
+const { applySecurityMiddleware } = require('../utils/securityMiddleware');
+const { apiErrorMiddleware } = require('../utils/errorHandler');
 
 const logger = createLogger('Dashboard');
 
@@ -23,7 +25,7 @@ if (!fs.existsSync(DATA_DIR)) {
 
 const sessionDb = new Database(SESSION_DB_PATH);
 
-// Initialize session table for bun:sqlite (replaces better-sqlite3-session-store)
+// Initialize session table for bun:sqlite
 sessionDb.run(`
   CREATE TABLE IF NOT EXISTS sessions (
     sid TEXT PRIMARY KEY,
@@ -99,11 +101,11 @@ function getSessionSecret() {
   if (process.env.SESSION_SECRET) {
     return process.env.SESSION_SECRET;
   }
-  
+
   if (fs.existsSync(SECRET_FILE_PATH)) {
     return fs.readFileSync(SECRET_FILE_PATH, 'utf8').trim();
   }
-  
+
   const secret = crypto.randomBytes(32).toString('hex');
   fs.writeFileSync(SECRET_FILE_PATH, secret);
   logger.info('Generated new session secret (add SESSION_SECRET to .env for manual control)');
@@ -118,34 +120,53 @@ function getSessionSecret() {
 function createDashboard(client) {
   const app = express();
 
-  // Middleware
-  app.use(express.json());
-  app.use(express.urlencoded({ extended: true }));
-  
-  // Session configuration with SQLite store
+  // Trust proxy for rate limiting IP detection (BP 6.2)
+  app.set('trust proxy', 1);
+
+  // ── Security middleware (BP 6.2, 6.6, 6.14) ─────────────────────────────
+  applySecurityMiddleware(app, {
+    rateLimit: { maxRequests: 200, windowMs: 60_000 },
+    bodyLimit: '1mb',
+  });
+
+  // ── Request context / correlation IDs (BP 5.14) ─────────────────────────
+  app.use(requestContextMiddleware);
+
+  // ── Body parsers (placed AFTER body size limit) ─────────────────────────
+  app.use(express.json({ limit: '1mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+
+  // ── Session configuration (BP 6.22 — hardened defaults) ─────────────────
+  const isProduction = process.env.NODE_ENV === 'production';
+
   app.use(session({
     store: new BunSqliteStore({
       client: sessionDb,
-      expired: { clear: true, intervalMs: SESSION_CLEANUP_INTERVAL_MS }
+      expired: { clear: true, intervalMs: SESSION_CLEANUP_INTERVAL_MS },
     }),
     secret: getSessionSecret(),
     resave: false,
     saveUninitialized: false,
+    name: 'shaggy.sid',                  // Don't use default 'connect.sid' — hide tech stack
     cookie: {
-      secure: process.env.NODE_ENV === 'production',
-      maxAge: SESSION_MAX_AGE_MS
-    }
+      secure: isProduction,               // HTTPS only in production
+      httpOnly: true,                     // Not accessible via JS (XSS protection)
+      sameSite: 'lax',                    // CSRF protection
+      maxAge: SESSION_MAX_AGE_MS,
+    },
+    rolling: true,                        // Refresh expiry on activity
   }));
 
   // Store client reference
   app.set('client', client);
 
+  // ── Cache headers ───────────────────────────────────────────────────────
   // Prevent caching of dynamic pages
-  app.use((req, res, next) => {
+  app.use((_req, res, next) => {
     res.set({
       'Cache-Control': 'no-store, no-cache, must-revalidate, private',
       'Pragma': 'no-cache',
-      'Expires': '0'
+      'Expires': '0',
     });
     next();
   });
@@ -163,16 +184,13 @@ function createDashboard(client) {
     next();
   });
 
-  // Load routes
+  // ── Routes ───────────────────────────────────────────────────────────────
   app.use('/auth', require('./routes/auth'));
   app.use('/api', require('./routes/api'));
   app.use('/', require('./routes/dashboard'));
 
-  // Error handling
-  app.use((err, req, res, next) => {
-    logger.error(`Dashboard error: ${err.stack || err.message}`);
-    res.status(500).render('404', { title: 'Error' });
-  });
+  // ── Centralized error handling (BP 2.4, 6.20) ───────────────────────────
+  app.use(apiErrorMiddleware);
 
   return app;
 }

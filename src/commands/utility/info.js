@@ -5,7 +5,7 @@ module.exports = {
     .setName('info')
     .setDescription('Display information about the bot')
     .setDMPermission(true),
-  
+
   async execute(interaction) {
     const embed = new EmbedBuilder()
       .setTitle('Bot Information')
@@ -18,7 +18,7 @@ module.exports = {
         { name: 'Server Count', value: `${interaction.client.guilds.cache.size}` }
       )
       .setFooter({ text: `Requested by ${interaction.user.tag}` });
-    
+
     await interaction.reply({ embeds: [embed] });
   },
 };

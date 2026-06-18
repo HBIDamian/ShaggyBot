@@ -6,28 +6,28 @@ module.exports = {
     .setName('userinfo')
     .setDescription('Display detailed information about a user')
     .setDMPermission(true)
-    .addUserOption(option => 
+    .addUserOption(option =>
       option.setName('user')
         .setDescription('The user to get information about')
         .setRequired(false)),
-  
+
   async execute(interaction) {
     const targetUser = interaction.options.getUser('user') || interaction.user;
     const member = interaction.guild?.members.cache.get(targetUser.id);
-    
+
     // Calculate account age
     const createdTimestamp = Math.floor(targetUser.createdTimestamp / 1000);
     const accountAgeDays = Math.floor((Date.now() - targetUser.createdTimestamp) / (1000 * 60 * 60 * 24));
-    
+
     const embed = new EmbedBuilder()
       .setTitle(`Info | ${targetUser.username}'s User Info`)
       .setDescription(`Joined Discord on <t:${createdTimestamp}:f>. That is **${accountAgeDays.toLocaleString()} days** ago!`)
       .setColor(member?.displayHexColor !== '#000000' ? member?.displayHexColor : '#5865F2')
       .setThumbnail(targetUser.displayAvatarURL({ dynamic: true, size: 256 }));
-    
+
     if (member) {
       // Calculate guild join info
-      const joinedTimestamp = Math.floor(member.joinedTimestamp / 1000);
+      const _joinedTimestamp = Math.floor(member.joinedTimestamp / 1000);
       const joinedAgeDays = Math.floor((Date.now() - member.joinedTimestamp) / (1000 * 60 * 60 * 24));
       const joinedDate = member.joinedAt.toLocaleDateString('en-GB', {
         day: 'numeric',
@@ -36,7 +36,7 @@ module.exports = {
         hour: '2-digit',
         minute: '2-digit'
       });
-      
+
       // Get presence/status
       const presence = member.presence;
       let status = 'Offline';
@@ -49,59 +49,59 @@ module.exports = {
         };
         status = statusMap[presence.status] || 'Offline';
       }
-      
+
       // Get activity
       let activity = 'None';
       if (presence?.activities?.length > 0) {
         const act = presence.activities[0];
-        if (act.type === 0) activity = `Playing ${act.name}`;
-        else if (act.type === 1) activity = `Streaming ${act.name}`;
-        else if (act.type === 2) activity = `Listening to ${act.name}`;
-        else if (act.type === 3) activity = `Watching ${act.name}`;
-        else if (act.type === 4) activity = act.state || 'Custom Status';
-        else if (act.type === 5) activity = `Competing in ${act.name}`;
-        else activity = act.name;
+        if (act.type === 0) {activity = `Playing ${act.name}`;}
+        else if (act.type === 1) {activity = `Streaming ${act.name}`;}
+        else if (act.type === 2) {activity = `Listening to ${act.name}`;}
+        else if (act.type === 3) {activity = `Watching ${act.name}`;}
+        else if (act.type === 4) {activity = act.state || 'Custom Status';}
+        else if (act.type === 5) {activity = `Competing in ${act.name}`;}
+        else {activity = act.name;}
       }
-      
+
       // Calculate join position
       const sortedMembers = [...interaction.guild.members.cache.values()]
         .sort((a, b) => a.joinedTimestamp - b.joinedTimestamp);
       const joinPosition = sortedMembers.findIndex(m => m.id === member.id);
-      
+
       // Get voice state
       const voiceState = member.voice;
       const isMuted = voiceState?.mute || voiceState?.selfMute ? 'Yes' : 'No';
       const isDeafened = voiceState?.deaf || voiceState?.selfDeaf ? 'Yes' : 'No';
-      
+
       // Get boosting status
       let boostStatus = 'N/A';
       if (member.premiumSince) {
         const boostDays = Math.floor((Date.now() - member.premiumSinceTimestamp) / (1000 * 60 * 60 * 24));
         boostStatus = `Since <t:${Math.floor(member.premiumSinceTimestamp / 1000)}:d> (${boostDays} days)`;
       }
-      
+
       // Get acknowledgements (special roles/permissions)
       const acknowledgements = [];
-      if (interaction.guild.ownerId === member.id) acknowledgements.push('Server Owner');
-      if (member.permissions.has('Administrator')) acknowledgements.push('Administrator');
-      else if (member.permissions.has('ManageGuild')) acknowledgements.push('Server Manager');
-      else if (member.permissions.has('ModerateMembers')) acknowledgements.push('Moderator');
-      
+      if (interaction.guild.ownerId === member.id) {acknowledgements.push('Server Owner');}
+      if (member.permissions.has('Administrator')) {acknowledgements.push('Administrator');}
+      else if (member.permissions.has('ManageGuild')) {acknowledgements.push('Server Manager');}
+      else if (member.permissions.has('ModerateMembers')) {acknowledgements.push('Moderator');}
+
       // Get roles
       const roles = member.roles.cache
         .filter(role => role.id !== interaction.guild.id)
         .sort((a, b) => b.position - a.position)
         .map(role => role.name)
         .join(', ') || 'None';
-      
+
       // Get warnings count for this guild
       const warningCount = db.getWarningCount(interaction.guild.id, targetUser.id);
-      
+
       // Get highest role for the replaced Avatar field
-      const highestRole = member.roles.highest.id !== interaction.guild.id 
-        ? member.roles.highest.name 
+      const highestRole = member.roles.highest.id !== interaction.guild.id
+        ? member.roles.highest.name
         : 'None';
-      
+
       embed.addFields(
         { name: '🚦 Status', value: `\`\`\`${status}\`\`\``, inline: true },
         { name: '🎮 Activity', value: `\`\`\`${activity.slice(0, 100)}\`\`\``, inline: true },
@@ -125,12 +125,12 @@ module.exports = {
         { name: 'ℹ️ Note', value: `\`\`\`This user is not in this server. Limited information available.\`\`\``, inline: false }
       );
     }
-    
-    embed.setFooter({ 
+
+    embed.setFooter({
       text: `Requested by ${interaction.user.username} | User ID: ${targetUser.id}`,
       iconURL: interaction.user.displayAvatarURL({ dynamic: true })
     });
-    
+
     await interaction.reply({ embeds: [embed] });
   },
 };

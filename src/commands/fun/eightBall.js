@@ -5,15 +5,15 @@ module.exports = {
     .setName('8ball')
     .setDescription('Ask the magic 8 ball a question')
     .setDMPermission(true)
-    .addStringOption(option => 
+    .addStringOption(option =>
       option
         .setName('question')
         .setDescription('The question to ask the magic 8 ball')
         .setRequired(true)),
-  
+
   async execute(interaction) {
     const question = interaction.options.getString('question');
-    
+
     // Possible responses
     const responses = [
       "It is certain.",
@@ -38,10 +38,10 @@ module.exports = {
       "Very doubtful.",
       "Chuck Norris."
     ];
-    
+
     // Randomly select a response
     const randomResponse = responses[Math.floor(Math.random() * responses.length)];
-    
+
     // Create embed
     const embed = new EmbedBuilder()
       .setTitle('🎱 Magic 8-Ball')
@@ -50,7 +50,7 @@ module.exports = {
         { name: 'Question', value: question, inline: false },
         { name: 'Answer', value: randomResponse, inline: false }
       );
-    
+
     await interaction.reply({ embeds: [embed] });
   },
 };

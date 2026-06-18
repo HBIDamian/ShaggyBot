@@ -1,7 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const { createLogger } = require('../../utils/logger');
+const { AppError } = require('../../utils/AppError');
+const { asyncHandler } = require('../../utils/errorHandler');
 const db = require('../../database/database');
+const fs = require('node:fs');
+const path = require('node:path');
+const { PermissionFlagsBits } = require('discord.js');
 
 const logger = createLogger('APIRoutes');
 
@@ -62,7 +67,7 @@ function createSettingsRoutes(path, getSettings, updateSettings, logName, hasSki
       const result = updateSettings(guildId, req.body);
       const settings = getSettings(guildId);
       logger.info(`Updated ${logName} settings for ${req.guild.name} (${guildId})`);
-      
+
       if (hasSkippedFields && result?.skippedFields?.length > 0) {
         logger.warn(`Skipped unknown ${logName} fields for ${req.guild.name}: ${result.skippedFields.join(', ')}`);
         res.json({ ...settings, _warning: `Some fields were not saved (unknown): ${result.skippedFields.join(', ')}` });
@@ -81,7 +86,7 @@ function createSettingsRoutes(path, getSettings, updateSettings, logName, hasSki
  */
 function requireAuth(req, res, next) {
   if (!req.session.user) {
-    return res.status(401).json({ error: 'Not authenticated' });
+    throw AppError.unauthorized('Not authenticated');
   }
   next();
 }
@@ -96,20 +101,35 @@ function requireGuildPermission(req, res, next) {
 
   const userGuild = userGuilds.find(g => g.id === guildId);
   if (!userGuild) {
-    return res.status(403).json({ error: 'You are not a member of this guild' });
+    throw AppError.forbidden('You are not a member of this guild');
   }
 
   if (!hasManagePermission(userGuild)) {
-    return res.status(403).json({ error: 'You must be a Server Owner, Administrator, or have Manage Server permission' });
+    throw AppError.forbidden('You must be a Server Owner, Administrator, or have Manage Server permission');
   }
 
   const botGuild = client.guilds.cache.get(guildId);
   if (!botGuild) {
-    return res.status(404).json({ error: 'Bot is not in this guild' });
+    throw AppError.notFound('Bot is not in this guild');
   }
 
   req.guild = botGuild;
   req.userGuild = userGuild;
+  next();
+}
+
+/**
+ * Middleware to check custom commands access (env-configured whitelist/off)
+ */
+function requireCustomCommandsAccess(req, res, next) {
+  const { guildId } = req.params;
+  const client = req.app.get('client');
+  const config = client.customCommandsConfig;
+
+  if (!config || !config.isAllowed(guildId)) {
+    throw AppError.forbidden('Custom commands are not enabled for this guild');
+  }
+
   next();
 }
 
@@ -132,7 +152,7 @@ router.get('/guilds', requireAuth, (req, res) => {
  */
 router.get('/guilds/:guildId', requireAuth, requireGuildPermission, (req, res) => {
   const guild = req.guild;
-  
+
   res.json({
     id: guild.id,
     name: guild.name,
@@ -178,23 +198,22 @@ createSettingsRoutes('/honeypot', db.getHoneypotSettings.bind(db), db.updateHone
 /**
  * Post or refresh the warning embed in the honeypot channel
  */
-router.post('/guilds/:guildId/honeypot/send-warning', requireAuth, requireGuildPermission, async (req, res) => {
+router.post('/guilds/:guildId/honeypot/send-warning', requireAuth, requireGuildPermission, asyncHandler(async (req, res) => {
   const { guildId } = req.params;
   const client = req.app.get('client');
   const { EmbedBuilder } = require('discord.js');
 
-  try {
-    const settings = db.getHoneypotSettings(guildId);
+  const settings = db.getHoneypotSettings(guildId);
 
-    if (!settings.honeypot_channel_id) {
-      return res.status(400).json({ error: 'No honeypot channel configured' });
-    }
+  if (!settings.honeypot_channel_id) {
+    throw AppError.validation('No honeypot channel configured');
+  }
 
-    const guild = client.guilds.cache.get(guildId);
-    if (!guild) return res.status(404).json({ error: 'Guild not found' });
+  const guild = client.guilds.cache.get(guildId);
+  if (!guild) {throw AppError.notFound('Guild not found');}
 
-    const channel = await guild.channels.fetch(settings.honeypot_channel_id).catch(() => null);
-    if (!channel) return res.status(404).json({ error: 'Honeypot channel not found' });
+  const channel = await guild.channels.fetch(settings.honeypot_channel_id).catch(() => null);
+  if (!channel) {throw AppError.notFound('Honeypot channel not found');}
 
     const title = settings.embed_title || 'DO NOT SEND MESSAGES IN THIS CHANNEL';
     const description = settings.embed_description || 'This channel is used to catch spam bots. Any messages sent here will result in automatic moderation action.';
@@ -227,40 +246,35 @@ router.post('/guilds/:guildId/honeypot/send-warning', requireAuth, requireGuildP
     db.updateHoneypotSettings(guildId, { embed_message_id: sent.id });
     logger.info(`Sent honeypot warning embed in ${guild.name} (${sent.id})`);
     return res.json({ success: true, action: 'sent', message_id: sent.id });
-
-  } catch (err) {
-    logger.error(`Error sending honeypot warning: ${err.message}`);
-    res.status(500).json({ error: 'Failed to send warning message' });
-  }
-});
+}));
 
 /**
  * Get mod actions for a guild
  */
-router.get('/guilds/:guildId/modactions', requireAuth, requireGuildPermission, async (req, res) => {
+router.get('/guilds/:guildId/modactions', requireAuth, requireGuildPermission, asyncHandler(async (req, res) => {
   const { guildId } = req.params;
   const limit = parseInt(req.query.limit) || 50;
   const actions = db.getModActions(guildId, Math.min(limit, 100));
-  
+
   // Collect unique user IDs and fetch usernames in parallel
   const userIds = new Set();
   actions.forEach(a => {
-    if (a.user_id) userIds.add(a.user_id);
-    if (a.moderator_id) userIds.add(a.moderator_id);
+    if (a.user_id) {userIds.add(a.user_id);}
+    if (a.moderator_id) {userIds.add(a.moderator_id);}
   });
-  
+
   const client = req.app.get('client');
   const usernames = await fetchUsernames(client, userIds);
-  
+
   // Attach usernames to actions
   const actionsWithNames = actions.map(a => ({
     ...a,
     user_name: usernames[a.user_id] || null,
     moderator_name: usernames[a.moderator_id] || null
   }));
-  
+
   res.json(actionsWithNames);
-});
+}));
 
 /**
  * Get mod log retention settings
@@ -277,20 +291,14 @@ router.get('/guilds/:guildId/modactions/retention', requireAuth, requireGuildPer
 router.post('/guilds/:guildId/modactions/retention', requireAuth, requireGuildPermission, (req, res) => {
   const { guildId } = req.params;
   const { retention_days } = req.body;
-  
+
   if (retention_days === undefined || retention_days < 1 || retention_days > 31) {
-    return res.status(400).json({ error: 'Retention days must be between 1 and 31' });
+    throw AppError.validation('Retention days must be between 1 and 31');
   }
-  
-  try {
-    db.setModLogRetentionDays(guildId, retention_days);
-    // Immediately clean up logs older than new retention
-    const deleted = db.cleanupOldModActions(guildId);
-    res.json({ success: true, retention_days: retention_days, deleted_count: deleted });
-  } catch (error) {
-    logger.error(`Error updating retention: ${error.message}`);
-    res.status(500).json({ error: 'Failed to update retention settings' });
-  }
+
+  db.setModLogRetentionDays(guildId, retention_days);
+  const deleted = db.cleanupOldModActions(guildId);
+  res.json({ success: true, retention_days, deleted_count: deleted });
 });
 
 /**
@@ -308,46 +316,34 @@ router.get('/guilds/:guildId/warnings/retention', requireAuth, requireGuildPermi
 router.post('/guilds/:guildId/warnings/retention', requireAuth, requireGuildPermission, (req, res) => {
   const { guildId } = req.params;
   const { retention_days } = req.body;
-  
+
   if (retention_days === undefined || retention_days < 0 || retention_days > 365) {
-    return res.status(400).json({ error: 'Retention days must be between 0 and 365 (0 = keep forever)' });
+    throw AppError.validation('Retention days must be between 0 and 365 (0 = keep forever)');
   }
-  
-  try {
-    db.setWarningRetentionDays(guildId, retention_days);
-    // Immediately clean up warnings older than new retention (unless 0)
-    const deleted = retention_days > 0 ? db.cleanupOldWarnings(guildId) : 0;
-    res.json({ success: true, retention_days: retention_days, deleted_count: deleted });
-  } catch (error) {
-    logger.error(`Error updating warning retention: ${error.message}`);
-    res.status(500).json({ error: 'Failed to update warning retention settings' });
-  }
+
+  db.setWarningRetentionDays(guildId, retention_days);
+  const deleted = retention_days > 0 ? db.cleanupOldWarnings(guildId) : 0;
+  res.json({ success: true, retention_days, deleted_count: deleted });
 });
 
 /**
  * Get warnings for a guild
  */
-router.get('/guilds/:guildId/warnings', requireAuth, requireGuildPermission, async (req, res) => {
+router.get('/guilds/:guildId/warnings', requireAuth, requireGuildPermission, asyncHandler(async (req, res) => {
   const { guildId } = req.params;
   const { userId } = req.query;
 
-  try {
-    if (userId) {
-      const warnings = db.getUserWarnings(guildId, userId);
-      return res.json(warnings);
-    }
-
-    // Get all unique users with warnings in this guild
-    const allWarnings = db.db.prepare(`
-      SELECT user_id, COUNT(*) as count FROM warnings WHERE guild_id = ? GROUP BY user_id
-    `).all(guildId);
-
-    res.json(allWarnings);
-  } catch (error) {
-    logger.error(`Error fetching warnings: ${error.message}`);
-    res.status(500).json({ error: 'Failed to fetch warnings' });
+  if (userId) {
+    const warnings = db.getUserWarnings(guildId, userId);
+    return res.json(warnings);
   }
-});
+
+  const allWarnings = db.db.prepare(`
+    SELECT user_id, COUNT(*) as count FROM warnings WHERE guild_id = ? GROUP BY user_id
+  `).all(guildId);
+
+  res.json(allWarnings);
+}));
 
 /**
  * Delete a warning
@@ -355,71 +351,59 @@ router.get('/guilds/:guildId/warnings', requireAuth, requireGuildPermission, asy
 router.delete('/guilds/:guildId/warnings/:warningId', requireAuth, requireGuildPermission, (req, res) => {
   const { guildId, warningId } = req.params;
 
-  try {
-    const success = db.deleteWarning(parseInt(warningId), guildId);
-    if (success) {
-      logger.info(`Deleted warning ${warningId} from guild ${guildId}`);
-      res.json({ success: true });
-    } else {
-      res.status(404).json({ error: 'Warning not found' });
-    }
-  } catch (error) {
-    logger.error(`Error deleting warning: ${error.message}`);
-    res.status(500).json({ error: 'Failed to delete warning' });
+  const success = db.deleteWarning(parseInt(warningId), guildId);
+  if (success) {
+    logger.info(`Deleted warning ${warningId} from guild ${guildId}`);
+    res.json({ success: true });
+  } else {
+    throw AppError.notFound('Warning not found');
   }
 });
 
 /**
  * Get all warnings for a guild (full list with search)
  */
-router.get('/guilds/:guildId/warnings/all', requireAuth, requireGuildPermission, async (req, res) => {
+router.get('/guilds/:guildId/warnings/all', requireAuth, requireGuildPermission, asyncHandler(async (req, res) => {
   const { guildId } = req.params;
 
-  try {
-    const allWarnings = db.db.prepare(`
-      SELECT * FROM warnings WHERE guild_id = ? ORDER BY created_at DESC
-    `).all(guildId);
+  const allWarnings = db.db.prepare(`
+    SELECT * FROM warnings WHERE guild_id = ? ORDER BY created_at DESC
+  `).all(guildId);
 
-    // Collect unique user IDs and fetch usernames in parallel
-    const userIds = new Set();
-    allWarnings.forEach(w => {
-      if (w.user_id) userIds.add(w.user_id);
-      if (w.moderator_id) userIds.add(w.moderator_id);
-    });
-    
-    const client = req.app.get('client');
-    const usernames = await fetchUsernames(client, userIds);
-    
-    // Attach usernames to warnings
-    const warningsWithNames = allWarnings.map(w => ({
-      ...w,
-      user_name: usernames[w.user_id] || null,
-      moderator_name: usernames[w.moderator_id] || null
-    }));
+  const userIds = new Set();
+  allWarnings.forEach(w => {
+    if (w.user_id) {userIds.add(w.user_id);}
+    if (w.moderator_id) {userIds.add(w.moderator_id);}
+  });
 
-    const now = new Date();
-    const monthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
-    
-    const stats = {
-      total: allWarnings.length,
-      active: allWarnings.length, // Could be filtered by expiration later
-      users: new Set(allWarnings.map(w => w.user_id)).size,
-      thisMonth: allWarnings.filter(w => new Date(w.created_at) >= monthAgo).length
-    };
+  const client = req.app.get('client');
+  const usernames = await fetchUsernames(client, userIds);
 
-    res.json({ warnings: warningsWithNames, stats });
-  } catch (error) {
-    logger.error(`Error fetching all warnings: ${error.message}`);
-    res.status(500).json({ error: 'Failed to fetch warnings' });
-  }
-});
+  const warningsWithNames = allWarnings.map(w => ({
+    ...w,
+    user_name: usernames[w.user_id] || null,
+    moderator_name: usernames[w.moderator_id] || null
+  }));
+
+  const now = new Date();
+  const monthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+
+  const stats = {
+    total: allWarnings.length,
+    active: allWarnings.length,
+    users: new Set(allWarnings.map(w => w.user_id)).size,
+    thisMonth: allWarnings.filter(w => new Date(w.created_at) >= monthAgo).length
+  };
+
+  res.json({ warnings: warningsWithNames, stats });
+}));
 
 /**
  * Get bot stats
  */
 router.get('/stats', requireAuth, (req, res) => {
   const client = req.app.get('client');
-  
+
   res.json({
     guilds: client.guilds.cache.size,
     users: client.guilds.cache.reduce((acc, guild) => acc + guild.memberCount, 0),
@@ -447,11 +431,11 @@ router.get('/guilds/:guildId/tags', requireAuth, requireGuildPermission, (req, r
 router.get('/guilds/:guildId/tags/:tagId', requireAuth, requireGuildPermission, (req, res) => {
   const { tagId } = req.params;
   const tag = db.getTagById(parseInt(tagId));
-  
+
   if (!tag) {
     return res.status(404).json({ error: 'Tag not found' });
   }
-  
+
   res.json(tag);
 });
 
@@ -461,35 +445,27 @@ router.get('/guilds/:guildId/tags/:tagId', requireAuth, requireGuildPermission, 
 router.post('/guilds/:guildId/tags', requireAuth, requireGuildPermission, (req, res) => {
   const { guildId } = req.params;
   const { name, response } = req.body;
-  
+
   if (!name || !response) {
-    return res.status(400).json({ error: 'Name and response are required' });
+    throw AppError.validation('Name and response are required');
   }
-  
   if (name.length > 32) {
-    return res.status(400).json({ error: 'Tag name must be 32 characters or less' });
+    throw AppError.validation('Tag name must be 32 characters or less');
   }
-  
   if (response.length > 2000) {
-    return res.status(400).json({ error: 'Tag response must be 2000 characters or less' });
+    throw AppError.validation('Tag response must be 2000 characters or less');
   }
-  
-  // Check if tag already exists
+
   const existing = db.getTag(guildId, name);
   if (existing) {
-    return res.status(409).json({ error: 'A tag with that name already exists' });
+    throw AppError.conflict('A tag with that name already exists');
   }
-  
-  try {
-    const user = req.session.user;
-    const tagId = db.createTag(guildId, name, response, user.id, user.username);
-    const tag = db.getTagById(tagId);
-    logger.info(`Tag "${name}" created in ${req.guild.name} by ${user.username}`);
-    res.status(201).json(tag);
-  } catch (error) {
-    logger.error(`Error creating tag: ${error.message}`);
-    res.status(500).json({ error: 'Failed to create tag' });
-  }
+
+  const user = req.session.user;
+  const tagId = db.createTag(guildId, name, response, user.id, user.username);
+  const tag = db.getTagById(tagId);
+  logger.info(`Tag "${name}" created in ${req.guild.name} by ${user.username}`);
+  res.status(201).json(tag);
 });
 
 /**
@@ -498,41 +474,34 @@ router.post('/guilds/:guildId/tags', requireAuth, requireGuildPermission, (req, 
 router.patch('/guilds/:guildId/tags/:tagId', requireAuth, requireGuildPermission, (req, res) => {
   const { guildId, tagId } = req.params;
   const { name, response } = req.body;
-  
+
   const tag = db.getTagById(parseInt(tagId));
   if (!tag || tag.guild_id !== guildId) {
-    return res.status(404).json({ error: 'Tag not found' });
+    throw AppError.notFound('Tag not found');
   }
-  
-  // Check for duplicate name if name is being changed
+
   if (name && name.toLowerCase() !== tag.name) {
     const existing = db.getTag(guildId, name);
     if (existing) {
-      return res.status(409).json({ error: 'A tag with that name already exists' });
+      throw AppError.conflict('A tag with that name already exists');
     }
   }
-  
+
   if (name && name.length > 32) {
-    return res.status(400).json({ error: 'Tag name must be 32 characters or less' });
+    throw AppError.validation('Tag name must be 32 characters or less');
   }
-  
   if (response && response.length > 2000) {
-    return res.status(400).json({ error: 'Tag response must be 2000 characters or less' });
+    throw AppError.validation('Tag response must be 2000 characters or less');
   }
-  
-  try {
-    const updates = {};
-    if (name) updates.name = name;
-    if (response) updates.response = response;
-    
-    db.updateTag(parseInt(tagId), updates);
-    const updated = db.getTagById(parseInt(tagId));
-    logger.info(`Tag "${tag.name}" updated in ${req.guild.name}`);
-    res.json(updated);
-  } catch (error) {
-    logger.error(`Error updating tag: ${error.message}`);
-    res.status(500).json({ error: 'Failed to update tag' });
-  }
+
+  const updates = {};
+  if (name) {updates.name = name;}
+  if (response) {updates.response = response;}
+
+  db.updateTag(parseInt(tagId), updates);
+  const updated = db.getTagById(parseInt(tagId));
+  logger.info(`Tag "${tag.name}" updated in ${req.guild.name}`);
+  res.json(updated);
 });
 
 /**
@@ -540,20 +509,15 @@ router.patch('/guilds/:guildId/tags/:tagId', requireAuth, requireGuildPermission
  */
 router.delete('/guilds/:guildId/tags/:tagId', requireAuth, requireGuildPermission, (req, res) => {
   const { guildId, tagId } = req.params;
-  
+
   const tag = db.getTagById(parseInt(tagId));
   if (!tag || tag.guild_id !== guildId) {
-    return res.status(404).json({ error: 'Tag not found' });
+    throw AppError.notFound('Tag not found');
   }
-  
-  try {
-    db.deleteTag(parseInt(tagId));
-    logger.info(`Tag "${tag.name}" deleted from ${req.guild.name}`);
-    res.json({ success: true });
-  } catch (error) {
-    logger.error(`Error deleting tag: ${error.message}`);
-    res.status(500).json({ error: 'Failed to delete tag' });
-  }
+
+  db.deleteTag(parseInt(tagId));
+  logger.info(`Tag "${tag.name}" deleted from ${req.guild.name}`);
+  res.json({ success: true });
 });
 
 // ==================== LOCKDOWN ====================
@@ -564,14 +528,14 @@ router.delete('/guilds/:guildId/tags/:tagId', requireAuth, requireGuildPermissio
 router.get('/guilds/:guildId/lockdown', requireAuth, requireGuildPermission, (req, res) => {
   const { guildId } = req.params;
   const settings = db.getModerationSettings(guildId);
-  
-  let channels = [];
+
+  let channels;
   try {
     channels = JSON.parse(settings.lockdown_channels || '[]');
   } catch {
     channels = [];
   }
-  
+
   res.json({
     channels,
     active: !!settings.lockdown_active,
@@ -601,279 +565,248 @@ router.patch('/guilds/:guildId/lockdown', requireAuth, requireGuildPermission, (
 /**
  * Start lockdown
  */
-router.post('/guilds/:guildId/lockdown/start', requireAuth, requireGuildPermission, async (req, res) => {
+router.post('/guilds/:guildId/lockdown/start', requireAuth, requireGuildPermission, asyncHandler(async (req, res) => {
   const { guildId } = req.params;
   const { message } = req.body;
   const client = req.app.get('client');
-  
+
+  const guild = client.guilds.cache.get(guildId);
+  if (!guild) {throw AppError.notFound('Guild not found');}
+
+  const settings = db.getModerationSettings(guildId);
+
+  let lockdownChannels;
   try {
-    const guild = client.guilds.cache.get(guildId);
-    if (!guild) {
-      return res.status(404).json({ error: 'Guild not found' });
-    }
-    
-    const settings = db.getModerationSettings(guildId);
-    
-    let lockdownChannels = [];
-    try {
-      lockdownChannels = JSON.parse(settings.lockdown_channels || '[]');
-    } catch {
-      lockdownChannels = [];
-    }
-    
-    if (lockdownChannels.length === 0) {
-      return res.status(400).json({ error: 'No lockdown channels configured' });
-    }
-    
-    if (settings.lockdown_active) {
-      return res.status(400).json({ error: 'Lockdown already active' });
-    }
-    
-    const { EmbedBuilder, ChannelType } = require('discord.js');
-    const lockedChannels = [];
-    const failedChannels = [];
-    
-    for (const channelId of lockdownChannels) {
-      try {
-        const channel = await guild.channels.fetch(channelId);
-        if (!channel || channel.type !== ChannelType.GuildText) {
-          failedChannels.push(channelId);
-          continue;
-        }
-        
-        const everyoneRole = guild.roles.everyone;
-        await channel.permissionOverwrites.edit(everyoneRole, {
-          SendMessages: false
-        }, { reason: `Lockdown initiated from dashboard by ${req.session.user.username}` });
-        
-        if (message) {
-          const lockEmbed = new EmbedBuilder()
-            .setTitle('🔒 Channel Locked')
-            .setDescription(message)
-            .setColor('#ED4245')
-            .setFooter({ text: `Lockdown initiated from dashboard` })
-            .setTimestamp();
-          
-          await channel.send({ embeds: [lockEmbed] }).catch(() => {});
-        }
-        
-        lockedChannels.push(channelId);
-      } catch (error) {
-        logger.error(`Failed to lock channel ${channelId}: ${error.message}`);
-        failedChannels.push(channelId);
-      }
-    }
-    
-    db.updateModerationSettings(guildId, {
-      lockdown_active: 1,
-      lockdown_message: message || null
-    });
-    
-    logger.info(`Lockdown started from dashboard in ${guild.name} - ${lockedChannels.length} channels locked`);
-    
-    res.json({
-      success: true,
-      lockedChannels,
-      failedChannels
-    });
-  } catch (error) {
-    logger.error(`Error starting lockdown: ${error.message}`);
-    res.status(500).json({ error: 'Failed to start lockdown' });
+    lockdownChannels = JSON.parse(settings.lockdown_channels || '[]');
+  } catch {
+    lockdownChannels = [];
   }
-});
+
+  if (lockdownChannels.length === 0) {
+    throw AppError.validation('No lockdown channels configured');
+  }
+  if (settings.lockdown_active) {
+    throw AppError.conflict('Lockdown already active');
+  }
+
+  const { EmbedBuilder, ChannelType } = require('discord.js');
+  const lockedChannels = [];
+  const failedChannels = [];
+
+  for (const channelId of lockdownChannels) {
+    try {
+      const channel = await guild.channels.fetch(channelId);
+      if (!channel || channel.type !== ChannelType.GuildText) {
+        failedChannels.push(channelId);
+        continue;
+      }
+
+      const everyoneRole = guild.roles.everyone;
+      await channel.permissionOverwrites.edit(everyoneRole, {
+        SendMessages: false,
+      }, { reason: `Lockdown initiated from dashboard by ${req.session.user.username}` });
+
+      if (message) {
+        const lockEmbed = new EmbedBuilder()
+          .setTitle('🔒 Channel Locked')
+          .setDescription(message)
+          .setColor('#ED4245')
+          .setFooter({ text: 'Lockdown initiated from dashboard' })
+          .setTimestamp();
+
+        await channel.send({ embeds: [lockEmbed] }).catch(() => {});
+      }
+
+      lockedChannels.push(channelId);
+    } catch (error) {
+      logger.error(`Failed to lock channel ${channelId}: ${error.message}`);
+      failedChannels.push(channelId);
+    }
+  }
+
+  db.updateModerationSettings(guildId, {
+    lockdown_active: 1,
+    lockdown_message: message || null,
+  });
+
+  logger.info(`Lockdown started from dashboard in ${guild.name} - ${lockedChannels.length} channels locked`);
+
+  res.json({ success: true, lockedChannels, failedChannels });
+}));
 
 /**
  * End lockdown
  */
-router.post('/guilds/:guildId/lockdown/end', requireAuth, requireGuildPermission, async (req, res) => {
+router.post('/guilds/:guildId/lockdown/end', requireAuth, requireGuildPermission, asyncHandler(async (req, res) => {
   const { guildId } = req.params;
   const client = req.app.get('client');
-  
+
+  const guild = client.guilds.cache.get(guildId);
+  if (!guild) {throw AppError.notFound('Guild not found');}
+
+  const settings = db.getModerationSettings(guildId);
+
+  let lockdownChannels;
   try {
-    const guild = client.guilds.cache.get(guildId);
-    if (!guild) {
-      return res.status(404).json({ error: 'Guild not found' });
-    }
-    
-    const settings = db.getModerationSettings(guildId);
-    
-    let lockdownChannels = [];
-    try {
-      lockdownChannels = JSON.parse(settings.lockdown_channels || '[]');
-    } catch {
-      lockdownChannels = [];
-    }
-    
-    if (!settings.lockdown_active) {
-      return res.status(400).json({ error: 'No lockdown is currently active' });
-    }
-    
-    const { EmbedBuilder, ChannelType } = require('discord.js');
-    const unlockedChannels = [];
-    const failedChannels = [];
-    
-    for (const channelId of lockdownChannels) {
-      try {
-        const channel = await guild.channels.fetch(channelId);
-        if (!channel || channel.type !== ChannelType.GuildText) {
-          failedChannels.push(channelId);
-          continue;
-        }
-        
-        const everyoneRole = guild.roles.everyone;
-        await channel.permissionOverwrites.edit(everyoneRole, {
-          SendMessages: null
-        }, { reason: `Lockdown ended from dashboard by ${req.session.user.username}` });
-        
-        const unlockEmbed = new EmbedBuilder()
-          .setTitle('🔓 Channel Unlocked')
-          .setDescription('This channel is now open again.')
-          .setColor('#57F287')
-          .setFooter({ text: `Lockdown ended from dashboard` })
-          .setTimestamp();
-        
-        await channel.send({ embeds: [unlockEmbed] }).catch(() => {});
-        
-        unlockedChannels.push(channelId);
-      } catch (error) {
-        logger.error(`Failed to unlock channel ${channelId}: ${error.message}`);
-        failedChannels.push(channelId);
-      }
-    }
-    
-    db.updateModerationSettings(guildId, {
-      lockdown_active: 0,
-      lockdown_message: null
-    });
-    
-    logger.info(`Lockdown ended from dashboard in ${guild.name} - ${unlockedChannels.length} channels unlocked`);
-    
-    res.json({
-      success: true,
-      unlockedChannels,
-      failedChannels
-    });
-  } catch (error) {
-    logger.error(`Error ending lockdown: ${error.message}`);
-    res.status(500).json({ error: 'Failed to end lockdown' });
+    lockdownChannels = JSON.parse(settings.lockdown_channels || '[]');
+  } catch {
+    lockdownChannels = [];
   }
-});
+
+  if (!settings.lockdown_active) {
+    throw AppError.validation('No lockdown is currently active');
+  }
+
+  const { EmbedBuilder, ChannelType } = require('discord.js');
+  const unlockedChannels = [];
+  const failedChannels = [];
+
+  for (const channelId of lockdownChannels) {
+    try {
+      const channel = await guild.channels.fetch(channelId);
+      if (!channel || channel.type !== ChannelType.GuildText) {
+        failedChannels.push(channelId);
+        continue;
+      }
+
+      const everyoneRole = guild.roles.everyone;
+      await channel.permissionOverwrites.edit(everyoneRole, {
+        SendMessages: null,
+      }, { reason: `Lockdown ended from dashboard by ${req.session.user.username}` });
+
+      const unlockEmbed = new EmbedBuilder()
+        .setTitle('🔓 Channel Unlocked')
+        .setDescription('This channel is now open again.')
+        .setColor('#57F287')
+        .setFooter({ text: 'Lockdown ended from dashboard' })
+        .setTimestamp();
+
+      await channel.send({ embeds: [unlockEmbed] }).catch(() => {});
+
+      unlockedChannels.push(channelId);
+    } catch (error) {
+      logger.error(`Failed to unlock channel ${channelId}: ${error.message}`);
+      failedChannels.push(channelId);
+    }
+  }
+
+  db.updateModerationSettings(guildId, {
+    lockdown_active: 0,
+    lockdown_message: null,
+  });
+
+  logger.info(`Lockdown ended from dashboard in ${guild.name} - ${unlockedChannels.length} channels unlocked`);
+
+  res.json({ success: true, unlockedChannels, failedChannels });
+}));
+
+// Permission flag names for display
+const permissionNames = {
+  [String(PermissionFlagsBits.Administrator)]: 'Administrator',
+  [String(PermissionFlagsBits.ManageGuild)]: 'Manage Server',
+  [String(PermissionFlagsBits.ManageRoles)]: 'Manage Roles',
+  [String(PermissionFlagsBits.ManageChannels)]: 'Manage Channels',
+  [String(PermissionFlagsBits.KickMembers)]: 'Kick Members',
+  [String(PermissionFlagsBits.BanMembers)]: 'Ban Members',
+  [String(PermissionFlagsBits.ManageMessages)]: 'Manage Messages',
+  [String(PermissionFlagsBits.ModerateMembers)]: 'Timeout Members',
+  [String(PermissionFlagsBits.ManageNicknames)]: 'Manage Nicknames',
+  [String(PermissionFlagsBits.ManageWebhooks)]: 'Manage Webhooks',
+  [String(PermissionFlagsBits.ManageEmojisAndStickers)]: 'Manage Emojis',
+  [String(PermissionFlagsBits.ViewAuditLog)]: 'View Audit Log',
+  [String(PermissionFlagsBits.MuteMembers)]: 'Mute Members',
+  [String(PermissionFlagsBits.DeafenMembers)]: 'Deafen Members',
+  [String(PermissionFlagsBits.MoveMembers)]: 'Move Members',
+  [String(PermissionFlagsBits.SendMessages)]: 'Send Messages',
+};
 
 /**
- * Get all bot commands with metadata
+ * Get permission names from permission bitfield
  */
-router.get('/commands', (req, res) => {
-  const client = req.app.get('client');
-  const fs = require('fs');
-  const path = require('path');
-  const { PermissionFlagsBits } = require('discord.js');
-  
-  // Permission flag names for display
-  const permissionNames = {
-    [String(PermissionFlagsBits.Administrator)]: 'Administrator',
-    [String(PermissionFlagsBits.ManageGuild)]: 'Manage Server',
-    [String(PermissionFlagsBits.ManageRoles)]: 'Manage Roles',
-    [String(PermissionFlagsBits.ManageChannels)]: 'Manage Channels',
-    [String(PermissionFlagsBits.KickMembers)]: 'Kick Members',
-    [String(PermissionFlagsBits.BanMembers)]: 'Ban Members',
-    [String(PermissionFlagsBits.ManageMessages)]: 'Manage Messages',
-    [String(PermissionFlagsBits.ModerateMembers)]: 'Timeout Members',
-    [String(PermissionFlagsBits.ManageNicknames)]: 'Manage Nicknames',
-    [String(PermissionFlagsBits.ManageWebhooks)]: 'Manage Webhooks',
-    [String(PermissionFlagsBits.ManageEmojisAndStickers)]: 'Manage Emojis',
-    [String(PermissionFlagsBits.ViewAuditLog)]: 'View Audit Log',
-    [String(PermissionFlagsBits.MuteMembers)]: 'Mute Members',
-    [String(PermissionFlagsBits.DeafenMembers)]: 'Deafen Members',
-    [String(PermissionFlagsBits.MoveMembers)]: 'Move Members',
-    [String(PermissionFlagsBits.SendMessages)]: 'Send Messages',
-  };
-  
-  /**
-   * Get permission names from permission bitfield
-   */
-  function getPermissionNames(permissionBitfield) {
-    if (!permissionBitfield) return [];
-    const permissions = [];
-    const permBigInt = BigInt(permissionBitfield);
-    
-    for (const [bit, name] of Object.entries(permissionNames)) {
-      if ((permBigInt & BigInt(bit)) === BigInt(bit)) {
-        permissions.push(name);
-      }
+function getPermissionNames(permissionBitfield) {
+  if (!permissionBitfield) {return [];}
+  const permissions = [];
+  const permBigInt = BigInt(permissionBitfield);
+
+  for (const [bit, name] of Object.entries(permissionNames)) {
+    if ((permBigInt & BigInt(bit)) === BigInt(bit)) {
+      permissions.push(name);
     }
-    return permissions;
   }
-  
-  /**
-   * Extract option info from SlashCommandBuilder option
-   */
-  function extractOptionInfo(option) {
-    const optionTypeMap = {
-      3: 'string',
-      4: 'integer',
-      5: 'boolean',
-      6: 'user',
-      7: 'channel',
-      8: 'role',
-      9: 'mentionable',
-      10: 'number',
-      11: 'attachment'
-    };
-    
-    return {
-      name: option.name,
-      description: option.description,
-      type: optionTypeMap[option.type] || 'unknown',
-      required: option.required || false,
-      choices: option.choices?.map(c => c.name) || null
-    };
-  }
-  
-  /**
-   * Extract subcommand info
-   */
-  function extractSubcommandInfo(subcommand) {
-    return {
-      name: subcommand.name,
-      description: subcommand.description,
-      options: subcommand.options?.map(extractOptionInfo) || []
-    };
-  }
-  
-  const commandsPath = path.join(__dirname, '../../commands');
-  const categories = fs.readdirSync(commandsPath, { withFileTypes: true })
+  return permissions;
+}
+
+/**
+ * Extract option info from SlashCommandBuilder option
+ */
+function extractOptionInfo(option) {
+  const optionTypeMap = {
+    3: 'string',
+    4: 'integer',
+    5: 'boolean',
+    6: 'user',
+    7: 'channel',
+    8: 'role',
+    9: 'mentionable',
+    10: 'number',
+    11: 'attachment'
+  };
+
+  return {
+    name: option.name,
+    description: option.description,
+    type: optionTypeMap[option.type] || 'unknown',
+    required: option.required || false,
+    choices: option.choices?.map(c => c.name) || null
+  };
+}
+
+/**
+ * Extract subcommand info
+ */
+function extractSubcommandInfo(subcommand) {
+  return {
+    name: subcommand.name,
+    description: subcommand.description,
+    options: subcommand.options?.map(extractOptionInfo) || []
+  };
+}
+
+/**
+ * Load command metadata grouped by category from a root path with category folders.
+ */
+function loadCommandsByCategory(commandsRootPath) {
+  if (!fs.existsSync(commandsRootPath)) {return {};}
+
+  const categories = fs.readdirSync(commandsRootPath, { withFileTypes: true })
     .filter(d => d.isDirectory())
     .map(d => d.name);
-  
+
   const commandsByCategory = {};
-  
+
   for (const category of categories) {
     const commands = [];
-    const categoryPath = path.join(commandsPath, category);
+    const categoryPath = path.join(commandsRootPath, category);
     const files = fs.readdirSync(categoryPath).filter(f => f.endsWith('.js'));
-    
+
     for (const file of files) {
       try {
-        // Clear require cache to get fresh data
         const filePath = path.join(categoryPath, file);
         delete require.cache[require.resolve(filePath)];
         const command = require(filePath);
-        
+
         if (command.data) {
           const data = command.data;
           const json = data.toJSON ? data.toJSON() : data;
-          
-          // Extract subcommands if any
+
           const subcommands = json.options?.filter(opt => opt.type === 1).map(extractSubcommandInfo) || [];
           const subcommandGroups = json.options?.filter(opt => opt.type === 2).map(group => ({
             name: group.name,
             description: group.description,
             subcommands: group.options?.map(extractSubcommandInfo) || []
           })) || [];
-          
-          // Extract regular options (not subcommands)
           const options = json.options?.filter(opt => opt.type > 2).map(extractOptionInfo) || [];
-          
+
           commands.push({
             name: json.name,
             description: json.description,
@@ -887,16 +820,207 @@ router.get('/commands', (req, res) => {
         logger.error(`Error loading command ${file} for API: ${err.message}`);
       }
     }
-    
+
     if (commands.length > 0) {
-      // Sort commands alphabetically
       commands.sort((a, b) => a.name.localeCompare(b.name));
       commandsByCategory[category] = commands;
     }
   }
-  
+
+  return commandsByCategory;
+}
+
+/**
+ * Get all bot commands with metadata (global commands only)
+ */
+router.get('/commands', (req, res) => {
+  const commandsPath = path.join(__dirname, '../../commands');
+  const commandsByCategory = loadCommandsByCategory(commandsPath);
   res.json(commandsByCategory);
 });
+
+/**
+ * Get all commands with metadata for a guild (global + custom guild commands)
+ */
+router.get('/guilds/:guildId/commands', requireAuth, requireGuildPermission, (req, res) => {
+  const { guildId: _guildId } = req.params;
+
+  const globalCommandsPath = path.join(__dirname, '../../commands');
+  const globalCommands = loadCommandsByCategory(globalCommandsPath);
+
+  res.json(globalCommands);
+});
+
+// ============================================================
+// CUSTOM GUILD COMMANDS (DYNAMIC DB-BASED)
+// ============================================================
+
+/**
+ * Check if a guild has any custom commands (file-based or DB-based)
+ * Returns false instead of 403 when access is denied (sidebar visibility check)
+ */
+router.get('/guilds/:guildId/has-custom-commands', requireAuth, requireGuildPermission, (req, res) => {
+  const { guildId } = req.params;
+  const client = req.app.get('client');
+  const config = client.customCommandsConfig;
+
+  // If mode is off or guild not whitelisted, report no custom commands
+  if (!config || !config.isAllowed(guildId)) {
+    return res.json({ hasCustomCommands: false });
+  }
+
+  const hasCommands = db.guildHasCustomCommands(guildId);
+  res.json({ hasCustomCommands: hasCommands });
+});
+
+/**
+ * List all custom commands for a guild (both DB-based and file-based)
+ */
+router.get('/guilds/:guildId/custom-commands', requireAuth, requireGuildPermission, requireCustomCommandsAccess, (req, res) => {
+  const { guildId } = req.params;
+  try {
+    const commands = [];
+
+    // ── DB-based dynamic commands
+    const dbCommands = db.getCustomGuildCommands(guildId);
+    for (const cmd of dbCommands) {
+      commands.push({
+        id: cmd.id,
+        command_name: cmd.command_name,
+        command_description: cmd.command_description,
+        category: cmd.category,
+        subcommands: cmd.subcommands,
+        default_permissions: cmd.default_permissions || null,
+        enabled: !!cmd.enabled,
+        source: 'db',
+        created_at: cmd.created_at,
+        updated_at: cmd.updated_at
+      });
+    }
+
+    res.json(commands);
+  } catch (err) {
+    logger.error(`Error listing custom commands: ${err.message}`);
+    res.status(500).json({ error: 'Failed to list custom commands' });
+  }
+});
+
+/**
+ * Get a single custom command by ID
+ */
+router.get('/guilds/:guildId/custom-commands/:commandId', requireAuth, requireGuildPermission, requireCustomCommandsAccess, (req, res) => {
+  const { guildId, commandId } = req.params;
+  try {
+    const command = db.getCustomGuildCommand(guildId, parseInt(commandId));
+    if (!command) {
+      return res.status(404).json({ error: 'Custom command not found' });
+    }
+    res.json(command);
+  } catch (err) {
+    logger.error(`Error getting custom command: ${err.message}`);
+    res.status(500).json({ error: 'Failed to get custom command' });
+  }
+});
+
+/**
+ * Create a new DB-based custom guild command
+ */
+router.post('/guilds/:guildId/custom-commands', requireAuth, requireGuildPermission, requireCustomCommandsAccess, (req, res) => {
+  const { guildId } = req.params;
+  const { command_name, command_description, category, subcommands, default_permissions } = req.body;
+
+  if (!command_name) {
+    throw AppError.validation('command_name is required');
+  }
+
+  if (subcommands && Array.isArray(subcommands)) {
+    for (const sc of subcommands) {
+      if (!sc.name || !/^[\w-]{1,32}$/.test(sc.name)) {
+        throw AppError.validation(`Invalid subcommand name: "${sc.name}"`);
+      }
+    }
+  }
+
+  const command = db.createCustomGuildCommand(guildId, {
+    command_name,
+    command_description: command_description || '',
+    category: category || 'custom',
+    subcommands: subcommands || [],
+    default_permissions: default_permissions || null,
+  });
+
+  logger.info(`Created custom command /${command.command_name} for guild ${guildId}`);
+  res.status(201).json(command);
+});
+
+/**
+ * Update custom command metadata (name, description, category, enabled)
+ */
+router.patch('/guilds/:guildId/custom-commands/:commandId', requireAuth, requireGuildPermission, requireCustomCommandsAccess, (req, res) => {
+  const { guildId, commandId } = req.params;
+  const updated = db.updateCustomGuildCommand(guildId, parseInt(commandId), req.body);
+  if (!updated) {
+    throw AppError.notFound('Custom command not found');
+  }
+  logger.info(`Updated custom command /${updated.command_name} for guild ${guildId}`);
+  res.json(updated);
+});
+
+/**
+ * Delete a custom guild command
+ */
+router.delete('/guilds/:guildId/custom-commands/:commandId', requireAuth, requireGuildPermission, requireCustomCommandsAccess, (req, res) => {
+  const { guildId, commandId } = req.params;
+  const deleted = db.deleteCustomGuildCommand(guildId, parseInt(commandId));
+  if (!deleted) {
+    throw AppError.notFound('Custom command not found');
+  }
+  logger.info(`Deleted custom command #${commandId} from guild ${guildId}`);
+  res.json({ success: true });
+});
+
+/**
+ * Update subcommands for a custom guild command
+ */
+router.patch('/guilds/:guildId/custom-commands/:commandId/subcommands', requireAuth, requireGuildPermission, requireCustomCommandsAccess, (req, res) => {
+  const { guildId, commandId } = req.params;
+  const { subcommands } = req.body;
+
+  if (!Array.isArray(subcommands)) {
+    throw AppError.validation('subcommands must be an array');
+  }
+
+  const updated = db.updateCustomCommandSubcommands(guildId, parseInt(commandId), subcommands);
+  if (!updated) {
+    throw AppError.notFound('Custom command not found');
+  }
+
+  logger.info(`Updated ${subcommands.length} subcommand(s) for /${updated.command_name} in guild ${guildId}`);
+  res.json(updated);
+});
+
+/**
+ * Trigger re-deployment of custom commands for the guild
+ */
+router.post('/guilds/:guildId/custom-commands/deploy', requireAuth, requireGuildPermission, requireCustomCommandsAccess, asyncHandler(async (req, res) => {
+  const { guildId } = req.params;
+  const client = req.app.get('client');
+
+  if (!client.refreshGuildCommands) {
+    throw AppError.internal('Bot does not support dynamic command refresh');
+  }
+
+  const dbCommands = db.getCustomGuildCommands(guildId).filter(c => c.enabled);
+  const result = await client.refreshGuildCommands(guildId);
+
+  logger.info(`Deployed custom commands for guild ${guildId} via dashboard (${dbCommands.length} DB)`);
+  res.json({
+    success: true,
+    message: 'Commands deployed successfully',
+    deployed: result ?? dbCommands.length,
+    dbCommandCount: dbCommands.length,
+  });
+}));
 
 // ============================================================
 // SERVER BACKUP & RESTORE
@@ -933,15 +1057,15 @@ router.get('/guilds/:guildId/backup', requireAuth, requireGuildPermission, async
   try {
     // ── Bot settings ────────────────────────────────────────────────────────
     const settings = {};
-    if (want('guild'))             settings.guild             = db.getGuildSettings(guildId);
-    if (want('automod'))           settings.automod           = db.getAutomodSettings(guildId);
-    if (want('moderation'))        settings.moderation        = db.getModerationSettings(guildId);
-    if (want('audit_log'))         settings.audit_log         = db.getAuditLogSettings(guildId);
-    if (want('starboard'))         settings.starboard         = db.getStarboardSettings(guildId);
-    if (want('anti_raid'))         settings.anti_raid         = db.getAntiRaidSettings(guildId);
-    if (want('troll_discourager')) settings.troll_discourager = db.getTrollDiscouragerSettings(guildId);
-    if (want('honeypot'))          settings.honeypot          = db.getHoneypotSettings(guildId);
-    if (want('command_toggles'))   settings.command_toggles   = db.getCommandToggleSettings(guildId);
+    if (want('guild'))             {settings.guild             = db.getGuildSettings(guildId);}
+    if (want('automod'))           {settings.automod           = db.getAutomodSettings(guildId);}
+    if (want('moderation'))        {settings.moderation        = db.getModerationSettings(guildId);}
+    if (want('audit_log'))         {settings.audit_log         = db.getAuditLogSettings(guildId);}
+    if (want('starboard'))         {settings.starboard         = db.getStarboardSettings(guildId);}
+    if (want('anti_raid'))         {settings.anti_raid         = db.getAntiRaidSettings(guildId);}
+    if (want('troll_discourager')) {settings.troll_discourager = db.getTrollDiscouragerSettings(guildId);}
+    if (want('honeypot'))          {settings.honeypot          = db.getHoneypotSettings(guildId);}
+    if (want('command_toggles'))   {settings.command_toggles   = db.getCommandToggleSettings(guildId);}
 
     const bot = {
       settings,
@@ -990,8 +1114,8 @@ router.get('/guilds/:guildId/backup', requireAuth, requireGuildPermission, async
       discord.channels = [...guild.channels.cache.values()]
         .sort((a, b) => {
           // Categories first, then by position
-          if (a.type === ChannelType.GuildCategory && b.type !== ChannelType.GuildCategory) return -1;
-          if (a.type !== ChannelType.GuildCategory && b.type === ChannelType.GuildCategory) return 1;
+          if (a.type === ChannelType.GuildCategory && b.type !== ChannelType.GuildCategory) {return -1;}
+          if (a.type !== ChannelType.GuildCategory && b.type === ChannelType.GuildCategory) {return 1;}
           return (a.rawPosition ?? 0) - (b.rawPosition ?? 0);
         })
         .map(ch => ({
@@ -1128,22 +1252,22 @@ router.post('/guilds/:guildId/restore', requireAuth, requireGuildPermission, asy
   };
 
   // ── Bot settings ─────────────────────────────────────────────────────────
-  if (s.guild             && shouldRestore('guild'))             attempt('guild',             () => db.updateGuildSettings(guildId, s.guild));
-  if (s.automod           && shouldRestore('automod'))           attempt('automod',           () => db.updateAutomodSettings(guildId, s.automod));
-  if (s.moderation        && shouldRestore('moderation'))        attempt('moderation',        () => db.updateModerationSettings(guildId, s.moderation));
-  if (s.audit_log         && shouldRestore('audit_log'))         attempt('audit_log',         () => db.updateAuditLogSettings(guildId, s.audit_log));
-  if (s.starboard         && shouldRestore('starboard'))         attempt('starboard',         () => db.updateStarboardSettings(guildId, s.starboard));
-  if (s.anti_raid         && shouldRestore('anti_raid'))         attempt('anti_raid',         () => db.updateAntiRaidSettings(guildId, s.anti_raid));
-  if (s.troll_discourager && shouldRestore('troll_discourager')) attempt('troll_discourager', () => db.updateTrollDiscouragerSettings(guildId, s.troll_discourager));
-  if (s.honeypot          && shouldRestore('honeypot'))          attempt('honeypot',          () => db.updateHoneypotSettings(guildId, s.honeypot));
-  if (s.command_toggles   && shouldRestore('command_toggles'))   attempt('command_toggles',   () => db.updateCommandToggleSettings(guildId, s.command_toggles));
+  if (s.guild             && shouldRestore('guild'))             {attempt('guild',             () => db.updateGuildSettings(guildId, s.guild));}
+  if (s.automod           && shouldRestore('automod'))           {attempt('automod',           () => db.updateAutomodSettings(guildId, s.automod));}
+  if (s.moderation        && shouldRestore('moderation'))        {attempt('moderation',        () => db.updateModerationSettings(guildId, s.moderation));}
+  if (s.audit_log         && shouldRestore('audit_log'))         {attempt('audit_log',         () => db.updateAuditLogSettings(guildId, s.audit_log));}
+  if (s.starboard         && shouldRestore('starboard'))         {attempt('starboard',         () => db.updateStarboardSettings(guildId, s.starboard));}
+  if (s.anti_raid         && shouldRestore('anti_raid'))         {attempt('anti_raid',         () => db.updateAntiRaidSettings(guildId, s.anti_raid));}
+  if (s.troll_discourager && shouldRestore('troll_discourager')) {attempt('troll_discourager', () => db.updateTrollDiscouragerSettings(guildId, s.troll_discourager));}
+  if (s.honeypot          && shouldRestore('honeypot'))          {attempt('honeypot',          () => db.updateHoneypotSettings(guildId, s.honeypot));}
+  if (s.command_toggles   && shouldRestore('command_toggles'))   {attempt('command_toggles',   () => db.updateCommandToggleSettings(guildId, s.command_toggles));}
 
   if (Array.isArray(botData.tags) && botData.tags.length > 0 && shouldRestore('tags')) {
     attempt('tags', () => {
       for (const tag of botData.tags) {
-        if (!tag.name || !tag.response) continue;
+        if (!tag.name || !tag.response) {continue;}
         const existing = db.getTag(guildId, tag.name);
-        if (!existing) db.createTag(guildId, tag.name, tag.response, tag.owner_id || '0', tag.owner_name || 'Unknown');
+        if (!existing) {db.createTag(guildId, tag.name, tag.response, tag.owner_id || '0', tag.owner_name || 'Unknown');}
       }
     });
   }
@@ -1156,14 +1280,14 @@ router.post('/guilds/:guildId/restore', requireAuth, requireGuildPermission, asy
     await attemptAsync('discord_guild_info', async () => {
       const info = disc.guild_info;
       const payload = {};
-      if (info.name                        != null) payload.name                        = info.name;
-      if (info.description                 != null) payload.description                 = info.description;
-      if (info.verificationLevel           != null) payload.verificationLevel           = info.verificationLevel;
-      if (info.explicitContentFilter       != null) payload.explicitContentFilter       = info.explicitContentFilter;
-      if (info.defaultMessageNotifications != null) payload.defaultMessageNotifications = info.defaultMessageNotifications;
-      if (info.preferredLocale             != null) payload.preferredLocale             = info.preferredLocale;
-      if (info.afkTimeout                  != null) payload.afkTimeout                  = info.afkTimeout;
-      if (Object.keys(payload).length > 0) await guild.edit(payload);
+      if (info.name                        !== null) {payload.name                        = info.name;}
+      if (info.description                 !== null) {payload.description                 = info.description;}
+      if (info.verificationLevel           !== null) {payload.verificationLevel           = info.verificationLevel;}
+      if (info.explicitContentFilter       !== null) {payload.explicitContentFilter       = info.explicitContentFilter;}
+      if (info.defaultMessageNotifications !== null) {payload.defaultMessageNotifications = info.defaultMessageNotifications;}
+      if (info.preferredLocale             !== null) {payload.preferredLocale             = info.preferredLocale;}
+      if (info.afkTimeout                  !== null) {payload.afkTimeout                  = info.afkTimeout;}
+      if (Object.keys(payload).length > 0) {await guild.edit(payload);}
     });
   }
 
@@ -1204,12 +1328,12 @@ router.post('/guilds/:guildId/restore', requireAuth, requireGuildPermission, asy
 
           if (existing) {
             const editData = { ...payload, reason: 'ShaggyBot backup restore' };
-            if (colorsObj) editData.colors = colorsObj;
+            if (colorsObj) {editData.colors = colorsObj;}
             const updated = await existing.edit(editData);
             roleIdMap[roleData.id] = updated.id;
           } else {
             const createData = { ...payload, reason: 'ShaggyBot backup restore' };
-            if (colorsObj) createData.colors = colorsObj;
+            if (colorsObj) {createData.colors = colorsObj;}
             const created = await guild.roles.create(createData);
             roleIdMap[roleData.id] = created.id;
           }
@@ -1217,7 +1341,7 @@ router.post('/guilds/:guildId/restore', requireAuth, requireGuildPermission, asy
           logger.warn(`Restore [discord_roles]: failed to restore role "${roleData.name}": ${roleErr.message}`);
           // Map the id anyway if an existing role was found, so channel overwrites still resolve
           const fallback = guild.roles.cache.find(r => r.name === roleData.name);
-          if (fallback) roleIdMap[roleData.id] = fallback.id;
+          if (fallback) {roleIdMap[roleData.id] = fallback.id;}
         }
       }
     });
@@ -1261,7 +1385,7 @@ router.post('/guilds/:guildId/restore', requireAuth, requireGuildPermission, asy
         } catch (catErr) {
           logger.warn(`Restore [discord_channels]: failed to restore category "${cat.name}": ${catErr.message}`);
           const fallback = guild.channels.cache.find(c => c.name === cat.name && c.type === ChannelType.GuildCategory);
-          if (fallback) categoryIdMap[cat.id] = fallback.id;
+          if (fallback) {categoryIdMap[cat.id] = fallback.id;}
         }
       }
 
@@ -1277,11 +1401,11 @@ router.post('/guilds/:guildId/restore', requireAuth, requireGuildPermission, asy
             parent:               parentId,
             permissionOverwrites: buildOverwrites(ch.permissionOverwrites),
             reason:               'ShaggyBot backup restore',
-            ...(ch.topic            != null && { topic:            ch.topic            }),
-            ...(ch.nsfw             != null && { nsfw:             ch.nsfw             }),
-            ...(ch.bitrate          != null && { bitrate:          ch.bitrate          }),
-            ...(ch.userLimit        != null && { userLimit:        ch.userLimit        }),
-            ...(ch.rateLimitPerUser != null && { rateLimitPerUser: ch.rateLimitPerUser }),
+            ...(ch.topic            !== null && { topic:            ch.topic            }),
+            ...(ch.nsfw             !== null && { nsfw:             ch.nsfw             }),
+            ...(ch.bitrate          !== null && { bitrate:          ch.bitrate          }),
+            ...(ch.userLimit        !== null && { userLimit:        ch.userLimit        }),
+            ...(ch.rateLimitPerUser !== null && { rateLimitPerUser: ch.rateLimitPerUser }),
           };
           if (existing) {
             await existing.edit(payload);
@@ -1317,14 +1441,9 @@ router.get('/guilds/:guildId/announcements', requireAuth, requireGuildPermission
 router.post('/guilds/:guildId/announcements', requireAuth, requireGuildPermission, (req, res) => {
   const { guildId } = req.params;
   const data = { ...req.body, created_by: req.session.user.id };
-  try {
-    const announcement = db.createAnnouncement(guildId, data);
-    logger.info(`Created announcement #${announcement.id} for ${req.guild.name}`);
-    res.status(201).json(announcement);
-  } catch (err) {
-    logger.error(`Error creating announcement: ${err.message}`);
-    res.status(500).json({ error: 'Failed to create announcement' });
-  }
+  const announcement = db.createAnnouncement(guildId, data);
+  logger.info(`Created announcement #${announcement.id} for ${req.guild.name}`);
+  res.status(201).json(announcement);
 });
 
 /**
@@ -1334,7 +1453,6 @@ router.patch('/guilds/:guildId/announcements/:id', requireAuth, requireGuildPerm
   const { guildId, id } = req.params;
   const updates = req.body;
 
-  // If schedule fields are changing, recompute next_run_at
   const scheduleFields = ['schedule_type', 'run_at', 'interval_minutes', 'day_of_week'];
   if (scheduleFields.some(f => f in updates)) {
     const existing = db.getAnnouncementById(Number(id), guildId);
@@ -1345,7 +1463,7 @@ router.patch('/guilds/:guildId/announcements/:id', requireAuth, requireGuildPerm
   }
 
   const result = db.updateAnnouncement(Number(id), guildId, updates);
-  if (!result) return res.status(404).json({ error: 'Announcement not found' });
+  if (!result) {throw AppError.notFound('Announcement not found');}
   logger.info(`Updated announcement #${id} for ${req.guild.name}`);
   res.json(result);
 });
@@ -1356,7 +1474,7 @@ router.patch('/guilds/:guildId/announcements/:id', requireAuth, requireGuildPerm
 router.delete('/guilds/:guildId/announcements/:id', requireAuth, requireGuildPermission, (req, res) => {
   const { guildId, id } = req.params;
   const deleted = db.deleteAnnouncement(Number(id), guildId);
-  if (!deleted) return res.status(404).json({ error: 'Announcement not found' });
+  if (!deleted) {throw AppError.notFound('Announcement not found');}
   logger.info(`Deleted announcement #${id} for ${req.guild.name}`);
   res.json({ success: true });
 });

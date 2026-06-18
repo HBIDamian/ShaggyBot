@@ -1,154 +1,231 @@
-const fs = require('fs');
-const path = require('path');
-const util = require('util');
-
-// Configuration
-const LOG_DIR = path.join(process.cwd(), 'logs');
-const MAX_LOG_FILES = 14; // Keep last 14 days of logs
-const LOG_LEVEL = process.env.LOG_LEVEL || 'info';
-
-// Month abbreviations for DD-Mon-YYYY filename format
-const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+'use strict';
 
 /**
- * Get today's date string in DD-Mon-YYYY format (e.g. 26-Feb-2026)
+ * Upgraded Logger — Node.js Best Practices 2.7, 5.2, 5.14, 5.18
+ *
+ * - Logs exclusively to stdout (BP 5.18 — let infrastructure route logs)
+ * - Supports structured JSON output in production for log aggregators
+ * - Supports transaction/correlation IDs via AsyncLocalStorage (BP 5.14)
+ * - Includes log levels with runtime filtering
+ * - All previously file-based logging is now stdout-only
+ *
+ * @see https://github.com/goldbergyoni/nodebestpractices#-27-use-a-mature-logger-to-increase-errors-visibility
  */
-function getDateString(date = new Date()) {
-  const dd  = String(date.getDate()).padStart(2, '0');
-  const mon = MONTHS[date.getMonth()];
-  const yyyy = date.getFullYear();
-  return `${dd}-${mon}-${yyyy}`;
+
+const { AsyncLocalStorage } = require('node:async_hooks');
+const crypto = require('node:crypto');
+
+// ── Transaction context (BP 5.14) ──────────────────────────────────────────
+
+const requestContext = new AsyncLocalStorage();
+
+/**
+ * Run a function within a request context, attaching a correlation ID
+ * to every log statement emitted during execution.
+ *
+ * ```js
+ * runWithContext({ requestId: 'abc-123' }, () => { ... });
+ * ```
+ *
+ * @param {Object}   context - Key/value pairs to attach to logs
+ * @param {Function} fn      - Function to run within the context
+ * @returns {*} Result of fn()
+ */
+function runWithContext(context, fn) {
+  return requestContext.run(context, fn);
 }
 
-// Log level priorities (higher = more important)
-const LOG_PRIORITIES = { debug: 0, info: 1, warn: 2, error: 3 };
+/** Get the current request context (if any) */
+function getRequestContext() {
+  return requestContext.getStore();
+}
 
-// ANSI color codes
-const COLORS = {
-  error: '\x1b[31m', // Red
-  warn: '\x1b[33m',  // Yellow
-  info: '\x1b[36m',  // Cyan
-  debug: '\x1b[90m', // Grey
-  reset: '\x1b[0m'
-};
+// ── Configuration ──────────────────────────────────────────────────────────
 
-// Shared state across all logger instances
-let currentLogFile = null;
-let currentLogDate = null;
-let writeStream = null;
-let isInitialized = false;
+const LOG_LEVEL = (process.env.LOG_LEVEL || 'info').toLowerCase();
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+
+const LOG_PRIORITIES = { debug: 0, info: 1, warn: 2, error: 3, fatal: 4 };
+const MIN_PRIORITY = LOG_PRIORITIES[LOG_LEVEL] ?? LOG_PRIORITIES.info;
+
+// ── Sensitive data redaction ───────────────────────────────────────────────
+
+const SENSITIVE_KEYS = new Set([
+  'token', 'password', 'secret', 'authorization', 'cookie',
+  'set-cookie', 'session', 'apikey', 'api_key', 'accessToken',
+]);
 
 /**
- * Initialize logging directory and clean up old logs
+ * Deep-redact sensitive values from an object (mutates a clone).
+ * Protected against circular references via a WeakSet tracker.
  */
-function initializeLogging() {
-  if (isInitialized) return;
-  
-  // Create logs directory if needed
-  if (!fs.existsSync(LOG_DIR)) {
-    fs.mkdirSync(LOG_DIR, { recursive: true });
+function redact(obj, _seen = new WeakSet(), _depth = 0) {
+  if (!obj || typeof obj !== 'object') { return obj; }
+
+  // Guard against circular references
+  if (_seen.has(obj)) { return '[Circular]'; }
+  _seen.add(obj);
+
+  // Guard against excessive depth
+  if (_depth > 4) { return '[Object]'; }
+
+  if (Array.isArray(obj)) {
+    return obj.map((item) => redact(item, _seen, _depth + 1));
   }
-  
-  // Clean up old log files
-  cleanupOldLogs();
-  isInitialized = true;
-}
 
-/**
- * Remove log files older than MAX_LOG_FILES days
- */
-function cleanupOldLogs() {
-  try {
-    // Match DD-Mon-YYYY.log (e.g. 26-Feb-2026.log)
-    const LOG_FILE_RE = /^\d{2}-[A-Z][a-z]{2}-\d{4}\.log$/;
-    const files = fs.readdirSync(LOG_DIR)
-      .filter(f => LOG_FILE_RE.test(f))
-      .map(f => ({ name: f, path: path.join(LOG_DIR, f), mtime: fs.statSync(path.join(LOG_DIR, f)).mtime }))
-      .sort((a, b) => b.mtime - a.mtime);
-
-    // Remove files beyond the limit
-    files.slice(MAX_LOG_FILES).forEach(f => {
-      try { fs.unlinkSync(f.path); } catch {}
-    });
-  } catch {}
-}
-
-/**
- * Get or create the write stream for today's log file
- * @returns {fs.WriteStream}
- */
-function getWriteStream() {
-  const today = getDateString();
-
-  if (currentLogDate !== today) {
-    // Close old stream if exists
-    if (writeStream) {
-      writeStream.end();
+  // Handle native objects — extract a safe summary instead of the raw object
+  if (obj.constructor && obj.constructor.name && !['Object', 'Array'].includes(obj.constructor.name)) {
+    const ctor = obj.constructor.name;
+    // Extract safe properties from common HTTP types
+    if (ctor === 'IncomingMessage' || ctor === 'ClientRequest') {
+      return { '[$]': ctor, method: obj.method, url: obj.url };
     }
-
-    currentLogDate = today;
-    currentLogFile = path.join(LOG_DIR, `${today}.log`);
-    writeStream = fs.createWriteStream(currentLogFile, { flags: 'a' });
-    
-    writeStream.on('error', (err) => {
-      console.error(`Log write error: ${err.message}`);
-    });
+    if (ctor === 'ServerResponse') {
+      return { '[$]': ctor, statusCode: obj.statusCode };
+    }
+    if (ctor === 'Socket') {
+      return { '[$]': ctor, remoteAddress: obj.remoteAddress };
+    }
+    return { '[$]': ctor };
   }
-  
-  return writeStream;
+
+  const out = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (SENSITIVE_KEYS.has(key.toLowerCase())) {
+      out[key] = '[REDACTED]';
+    } else if (typeof value === 'object' && value !== null) {
+      out[key] = redact(value, _seen, _depth + 1);
+    } else {
+      out[key] = value;
+    }
+  }
+  return out;
 }
 
+// ── Core logger ────────────────────────────────────────────────────────────
+
 /**
- * Creates a logger instance for the specified module
- * @param {string} moduleName - The name of the module
- * @returns {Object} - Logger object with methods for different log levels
+ * Creates a logger instance for a named module.
+ *
+ * @param {string} module - Module name (e.g., 'APIRoutes', 'BanCommand')
+ * @returns {{ debug, info, warn, error, fatal }}
  */
-function createLogger(moduleName) {
-  initializeLogging();
-  
-  const minPriority = LOG_PRIORITIES[LOG_LEVEL] ?? LOG_PRIORITIES.info;
+function createLogger(module) {
+  function emit(level, message, extra = {}) {
+    if (LOG_PRIORITIES[level] < MIN_PRIORITY) { return; }
 
-  /**
-   * Format and write log message
-   * @param {string} level - Log level
-   * @param {string} message - Log message
-   * @param {Error|undefined} error - Optional error object
-   */
-  function log(level, message, error) {
-    // Skip if below minimum log level
-    if (LOG_PRIORITIES[level] < minPriority) return;
-    
-    const timestamp = new Date().toISOString();
-    const errorStr = error ? '\n' + util.format(error) : '';
-    const logLine = `${timestamp} [${level.toUpperCase()}] [${moduleName}] ${message}${errorStr}`;
+    const ctx = getRequestContext() || {};
+    const logEntry = {
+      level,
+      module,
+      message,
+      timestamp: new Date().toISOString(),
+      ctx,
+      extra,
+    };
 
-    // Write to console with color
-    const color = COLORS[level] || '';
-    console.log(`${color}${logLine}${COLORS.reset}`);
-
-    // Write to file asynchronously
-    try {
-      const stream = getWriteStream();
-      stream.write(logLine + '\n');
-    } catch {}
+    if (IS_PRODUCTION) {
+      emitProduction(logEntry);
+    } else {
+      emitDev(logEntry);
+    }
   }
 
   return {
-    error: (message, error) => log('error', message, error),
-    warn: (message, error) => log('warn', message, error),
-    info: (message) => log('info', message),
-    debug: (message) => log('debug', message)
+    debug: (message, extra) => emit('debug', message, extra),
+    info: (message, extra) => emit('info', message, extra),
+    warn: (message, extra) => emit('warn', message, extra),
+    error: (message, extra) => emit('error', message, extra),
+    fatal: (message, extra) => emit('fatal', message, extra),
   };
 }
 
 /**
- * Gracefully close the log stream
+ * Format the `extra` argument for structured log output.
  */
-function closeLogger() {
-  if (writeStream) {
-    writeStream.end();
-    writeStream = null;
+function formatExtra(extra) {
+  if (extra instanceof Error) {
+    const result = { error: extra.message, stack: extra.stack, code: extra.code };
+    if (extra.cause) { result.cause = extra.cause.message; }
+    return result;
   }
+  return redact(extra);
 }
 
-module.exports = { createLogger, closeLogger };
+/**
+ * Emit a structured JSON log entry for production.
+ */
+function emitProduction({ level, module, message, timestamp, ctx, extra }) {
+  const entry = {
+    timestamp,
+    level,
+    module,
+    message,
+    requestId: ctx.requestId,
+    transactionId: ctx.transactionId,
+    guildId: ctx.guildId,
+    userId: ctx.userId,
+    ...formatExtra(extra),
+  };
+  console.log(JSON.stringify(entry));
+}
+
+/**
+ * Emit a human-readable colored log entry for development.
+ */
+function emitDev({ level, module, message, timestamp, ctx, extra }) {
+  const colorMap = { error: '\x1b[31m', fatal: '\x1b[35m', warn: '\x1b[33m', info: '\x1b[36m', debug: '\x1b[90m' };
+  const color = colorMap[level] || '';
+  const reset = '\x1b[0m';
+  const requestId = ctx.requestId ? ` [${ctx.requestId}]` : '';
+
+  let line = `${timestamp} [${level.toUpperCase()}] [${module}]${requestId} ${message}`;
+
+  if (extra instanceof Error) {
+    line += `\n  → Error: ${extra.message}`;
+    if (extra.stack) {
+      line += `\n  ${extra.stack.split('\n').slice(0, 4).join('\n  ')}`;
+    }
+  } else if (extra && typeof extra === 'object' && Object.keys(extra).length > 0) {
+    line += ` ${JSON.stringify(redact(extra))}`;
+  } else if (extra && typeof extra === 'string') {
+    line += ` ${extra}`;
+  }
+
+  console.log(`${color}${line}${reset}`);
+}
+
+/**
+ * Close the logger (no-op — we only write to stdout now per BP 5.18).
+ * Kept for backward compatibility.
+ */
+function closeLogger() {
+  // stdout is managed by the runtime — nothing to close
+}
+
+/**
+ * Express middleware that attaches request context (BP 5.14).
+ * Place early in the middleware chain.
+ *
+ * ```js
+ * app.use(requestContextMiddleware);
+ * ```
+ */
+function requestContextMiddleware(req, res, next) {
+  const requestId = req.headers['x-request-id'] || crypto.randomUUID();
+  const transactionId = req.headers['x-transaction-id'] || requestId;
+
+  runWithContext({ requestId, transactionId }, () => {
+    // Echo the request ID on the response header for client traceability
+    res.setHeader('x-request-id', requestId);
+    next();
+  });
+}
+
+module.exports = {
+  createLogger,
+  closeLogger,
+  runWithContext,
+  getRequestContext,
+  requestContextMiddleware,
+};

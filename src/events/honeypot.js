@@ -8,19 +8,19 @@ const logger = createLogger('Honeypot');
 module.exports = {
   name: Events.MessageCreate,
   once: false,
-  
+
   async execute(message, client) {
     // Skip bot messages and DMs
-    if (message.author.bot || !message.guild) return;
+    if (message.author.bot || !message.guild) {return;}
 
     // Get honeypot settings for this guild
     const settings = db.getHoneypotSettings(message.guild.id);
-    
+
     // Skip if honeypot is disabled or no channel set
-    if (!settings.enabled || !settings.honeypot_channel_id) return;
+    if (!settings.enabled || !settings.honeypot_channel_id) {return;}
 
     // Check if this message is in the honeypot channel
-    if (message.channel.id !== settings.honeypot_channel_id) return;
+    if (message.channel.id !== settings.honeypot_channel_id) {return;}
 
     logger.info(`Honeypot triggered by ${message.author.tag} (${message.author.id}) in ${message.guild.name}`);
 
@@ -30,9 +30,9 @@ module.exports = {
 
     // Check if bot can action this user
     const botMember = message.guild.members.me;
-    
+
     // Can't action bots (shouldn't happen as we skip bots earlier)
-    if (user.bot) return;
+    if (user.bot) {return;}
 
     // Can't action the server owner
     if (message.guild.ownerId === user.id) {
@@ -99,7 +99,7 @@ module.exports = {
             deleteMessageSeconds
           });
           break;
-          
+
         case 'softban':
           // Softban: ban then immediately unban (deletes messages)
           await message.guild.members.ban(user.id, {
@@ -107,16 +107,16 @@ module.exports = {
             deleteMessageSeconds
           });
           // Small delay to ensure ban is processed
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          await new Promise(resolve => { setTimeout(resolve, 1000); });
           await message.guild.members.unban(user.id, `${reason} (softban 2/2) - unbanning`);
           break;
-          
+
         case 'kick':
           if (member) {
             await member.kick(reason);
           }
           break;
-          
+
         default:
           logger.warn(`Unknown honeypot action: ${action}`);
           return;
@@ -154,11 +154,11 @@ module.exports = {
  * Log honeypot event to the log channel
  */
 async function logHoneypotEvent(message, settings, status, errorReason = null, action = null) {
-  if (!settings.log_channel_id) return;
+  if (!settings.log_channel_id) {return;}
 
   try {
     const logChannel = await message.guild.channels.fetch(settings.log_channel_id).catch(() => null);
-    if (!logChannel) return;
+    if (!logChannel) {return;}
 
     const user = message.author;
     const embed = new EmbedBuilder()
@@ -178,8 +178,8 @@ async function logHoneypotEvent(message, settings, status, errorReason = null, a
       if (message.content) {
         embed.addFields({
           name: 'Message Content',
-          value: message.content.length > 1000 
-            ? message.content.substring(0, 1000) + '...' 
+          value: message.content.length > 1000
+            ? message.content.substring(0, 1000) + '...'
             : message.content || '*No text content*'
         });
       }
@@ -220,6 +220,6 @@ function getActionPastTense(action) {
  * Capitalize first letter
  */
 function capitalizeFirst(str) {
-  if (!str) return str;
+  if (!str) {return str;}
   return str.charAt(0).toUpperCase() + str.slice(1);
 }

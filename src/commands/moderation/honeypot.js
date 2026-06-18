@@ -80,7 +80,7 @@ async function handleSetup(interaction) {
   // Check bot permissions in honeypot channel
   const botMember = interaction.guild.members.me;
   const honeypotPerms = honeypotChannel.permissionsFor(botMember);
-  
+
   if (!honeypotPerms.has(PermissionFlagsBits.ViewChannel) || !honeypotPerms.has(PermissionFlagsBits.ManageMessages)) {
     return interaction.reply({
       content: `❌ I need **View Channel** and **Manage Messages** permissions in ${honeypotChannel}.`,
@@ -219,7 +219,7 @@ async function handleStatus(interaction) {
     } else {
       const honeypotChannel = settings.honeypot_channel_id ? `<#${settings.honeypot_channel_id}>` : 'Not set';
       const logChannel = settings.log_channel_id ? `<#${settings.log_channel_id}>` : 'Not set';
-      
+
       const actionDescriptions = {
         softban: 'Softban (ban & unban)',
         ban: 'Permanent ban',

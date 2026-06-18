@@ -31,14 +31,14 @@ const DEFAULT_BAD_WORDS = [
 module.exports = {
   name: Events.MessageCreate,
   once: false,
-  
+
   async execute(message, client) {
     // Skip bot messages and DMs
-    if (message.author.bot || !message.guild) return;
+    if (message.author.bot || !message.guild) {return;}
 
     // Get automod settings for this guild
     const settings = db.getAutomodSettings(message.guild.id);
-    
+
     // Skip if automod is disabled
     if (!settings.enabled) {
       logger.debug(`AutoMod disabled for guild ${message.guild.id}`);
@@ -47,17 +47,17 @@ module.exports = {
 
     // Check exemptions
     const memberRoles = message.member?.roles.cache.map(r => r.id) || [];
-    
+
     // Check if user is exempt
     const isRoleExempt = settings.exempt_roles.some(roleId => memberRoles.includes(roleId));
     const isChannelExempt = settings.exempt_channels.includes(message.channel.id);
-    
+
     // Check permission-based exemptions
     const isAdmin = message.member?.permissions.has(PermissionFlagsBits.Administrator);
-    const isMod = message.member?.permissions.has(PermissionFlagsBits.ManageMessages) || 
+    const isMod = message.member?.permissions.has(PermissionFlagsBits.ManageMessages) ||
                   message.member?.permissions.has(PermissionFlagsBits.ModerateMembers);
     const isBot = message.author.bot;
-    
+
     if (isRoleExempt || isChannelExempt) {
       logger.debug(`User ${message.author.tag} exempt (role/channel)`);
       return;
@@ -70,7 +70,7 @@ module.exports = {
       logger.debug(`User ${message.author.tag} exempt (mod)`);
       return;
     }
-    if (settings.exclude_bots && isBot) return;
+    if (settings.exclude_bots && isBot) {return;}
 
     logger.debug(`Checking message from ${message.author.tag}: "${message.content.substring(0, 50)}..."`);
 
@@ -80,97 +80,97 @@ module.exports = {
     // Phishing URLs (check first - most dangerous)
     if (settings.phishing_enabled) {
       const result = checkPhishing(message, settings);
-      if (result) violations.push(result);
+      if (result) {violations.push(result);}
     }
 
     // Anti-spam check
     if (settings.spam_enabled) {
       const result = checkSpam(message, settings);
-      if (result) violations.push(result);
+      if (result) {violations.push(result);}
     }
 
     // Bad words check
     if (settings.bad_words_enabled) {
       const result = checkBadWords(message, settings);
-      if (result) violations.push(result);
+      if (result) {violations.push(result);}
     }
 
     // Mass Caps check
     if (settings.caps_enabled) {
       const result = checkCaps(message, settings);
-      if (result) violations.push(result);
+      if (result) {violations.push(result);}
     }
 
     // Duplicate Characters check
     if (settings.duplicate_chars_enabled) {
       const result = checkDuplicateChars(message, settings);
-      if (result) violations.push(result);
+      if (result) {violations.push(result);}
     }
 
     // Duplicate Words check
     if (settings.duplicate_words_enabled) {
       const result = checkDuplicateWords(message, settings);
-      if (result) violations.push(result);
+      if (result) {violations.push(result);}
     }
 
     // Mass Mentions check
     if (settings.mass_mentions_enabled) {
       const result = checkMentions(message, settings);
-      if (result) violations.push(result);
+      if (result) {violations.push(result);}
     }
 
     // Mass Emoji check
     if (settings.mass_emoji_enabled) {
       const result = checkMassEmoji(message, settings);
-      if (result) violations.push(result);
+      if (result) {violations.push(result);}
     }
 
     // Spoilers check
     if (settings.spoilers_enabled) {
       const result = checkSpoilers(message, settings);
-      if (result) violations.push(result);
+      if (result) {violations.push(result);}
     }
 
     // Discord Invites check
     if (settings.invites_enabled) {
       const result = checkInvites(message, settings, client);
-      if (result) violations.push(result);
+      if (result) {violations.push(result);}
     }
 
     // Website URLs check
     if (settings.links_enabled) {
       const result = checkLinks(message, settings);
-      if (result) violations.push(result);
+      if (result) {violations.push(result);}
     }
 
     // File Extensions check
     if (settings.file_extensions_enabled) {
       const result = checkFileExtensions(message, settings);
-      if (result) violations.push(result);
+      if (result) {violations.push(result);}
     }
 
     // Stickers check
     if (settings.stickers_enabled) {
       const result = checkStickers(message, settings);
-      if (result) violations.push(result);
+      if (result) {violations.push(result);}
     }
 
     // Zalgo Text check
     if (settings.zalgo_enabled) {
       const result = checkZalgo(message, settings);
-      if (result) violations.push(result);
+      if (result) {violations.push(result);}
     }
 
     // Phone Numbers check
     if (settings.phone_numbers_enabled) {
       const result = checkPhoneNumbers(message, settings);
-      if (result) violations.push(result);
+      if (result) {violations.push(result);}
     }
 
     // Markdown Headers check
     if (settings.markdown_headers_enabled) {
       const result = checkMarkdownHeaders(message, settings);
-      if (result) violations.push(result);
+      if (result) {violations.push(result);}
     }
 
     // Process violations (handle the most severe one)
@@ -178,7 +178,7 @@ module.exports = {
       // Sort by severity: ban > kick > mute > delete_warn > delete
       const severityOrder = { ban: 5, kick: 4, mute: 3, delete_warn: 2, delete: 1 };
       violations.sort((a, b) => (severityOrder[b.action] || 0) - (severityOrder[a.action] || 0));
-      
+
       const violation = violations[0];
       await handleViolation(message, violation, settings, client);
     }
@@ -197,7 +197,7 @@ function checkPhishing(message, settings) {
       deleteMessage: true
     };
   }
-  
+
   return null;
 }
 
@@ -208,31 +208,31 @@ function checkSpam(message, settings) {
   const guildId = message.guild.id;
   const userId = message.author.id;
   const now = Date.now();
-  
+
   if (!spamTracker.has(guildId)) {
     spamTracker.set(guildId, new Map());
   }
-  
+
   const guildTracker = spamTracker.get(guildId);
-  
+
   if (!guildTracker.has(userId)) {
     guildTracker.set(userId, { messages: [], lastWarning: 0 });
   }
-  
+
   const userTracker = guildTracker.get(userId);
-  
+
   // Clean old messages
   userTracker.messages = userTracker.messages.filter(
     timestamp => now - timestamp < settings.spam_interval
   );
-  
+
   userTracker.messages.push(now);
-  
+
   if (userTracker.messages.length >= settings.spam_threshold) {
-    if (now - userTracker.lastWarning < 10000) return null;
+    if (now - userTracker.lastWarning < 10000) {return null;}
     userTracker.lastWarning = now;
     userTracker.messages = [];
-    
+
     return {
       type: 'spam',
       action: settings.spam_action,
@@ -240,7 +240,7 @@ function checkSpam(message, settings) {
       deleteMessage: true
     };
   }
-  
+
   return null;
 }
 
@@ -249,15 +249,15 @@ function checkSpam(message, settings) {
  */
 function checkBadWords(message, settings) {
   const content = message.content.toLowerCase();
-  
+
   // Combine default list (if enabled) with custom list
   let wordList = [...(settings.bad_words_list || [])];
   if (settings.bad_words_use_default) {
     wordList = [...DEFAULT_BAD_WORDS, ...wordList];
   }
-  
-  if (wordList.length === 0) return null;
-  
+
+  if (wordList.length === 0) {return null;}
+
   for (const word of wordList) {
     // Use word boundary check for more accurate matching
     const regex = new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
@@ -270,7 +270,7 @@ function checkBadWords(message, settings) {
       };
     }
   }
-  
+
   return null;
 }
 
@@ -279,15 +279,15 @@ function checkBadWords(message, settings) {
  */
 function checkCaps(message, settings) {
   const content = message.content;
-  
-  if (content.length < settings.caps_min_chars) return null;
-  
+
+  if (content.length < settings.caps_min_chars) {return null;}
+
   const letters = content.replace(/[^a-zA-Z]/g, '');
-  if (letters.length === 0) return null;
-  
+  if (letters.length === 0) {return null;}
+
   const uppercase = letters.replace(/[^A-Z]/g, '').length;
   const capsPercentage = (uppercase / letters.length) * 100;
-  
+
   if (capsPercentage >= settings.caps_percentage) {
     return {
       type: 'caps',
@@ -296,7 +296,7 @@ function checkCaps(message, settings) {
       deleteMessage: true
     };
   }
-  
+
   return null;
 }
 
@@ -305,15 +305,15 @@ function checkCaps(message, settings) {
  */
 function checkDuplicateChars(message, settings) {
   const content = message.content;
-  
+
   // Find repeated characters
   const regex = new RegExp(`(.)\\1{${settings.duplicate_chars_min - 1},}`, 'gi');
   const matches = content.match(regex);
-  
+
   if (matches) {
     const totalRepeated = matches.reduce((sum, m) => sum + m.length, 0);
     const percentage = (totalRepeated / content.length) * 100;
-    
+
     if (percentage >= settings.duplicate_chars_percentage) {
       return {
         type: 'duplicate_chars',
@@ -323,7 +323,7 @@ function checkDuplicateChars(message, settings) {
       };
     }
   }
-  
+
   return null;
 }
 
@@ -332,13 +332,13 @@ function checkDuplicateChars(message, settings) {
  */
 function checkDuplicateWords(message, settings) {
   const words = message.content.toLowerCase().split(/\s+/).filter(w => w.length > 0);
-  
-  if (words.length < settings.duplicate_words_count) return null;
-  
+
+  if (words.length < settings.duplicate_words_count) {return null;}
+
   // Count consecutive duplicates
   let maxDuplicates = 1;
   let currentCount = 1;
-  
+
   for (let i = 1; i < words.length; i++) {
     if (words[i] === words[i - 1]) {
       currentCount++;
@@ -347,7 +347,7 @@ function checkDuplicateWords(message, settings) {
       currentCount = 1;
     }
   }
-  
+
   if (maxDuplicates >= settings.duplicate_words_count) {
     return {
       type: 'duplicate_words',
@@ -356,7 +356,7 @@ function checkDuplicateWords(message, settings) {
       deleteMessage: true
     };
   }
-  
+
   return null;
 }
 
@@ -365,7 +365,7 @@ function checkDuplicateWords(message, settings) {
  */
 function checkMentions(message, settings) {
   const mentionCount = message.mentions.users.size + message.mentions.roles.size;
-  
+
   if (mentionCount >= settings.mass_mentions_count) {
     return {
       type: 'mentions',
@@ -374,7 +374,7 @@ function checkMentions(message, settings) {
       deleteMessage: true
     };
   }
-  
+
   return null;
 }
 
@@ -383,7 +383,7 @@ function checkMentions(message, settings) {
  */
 function checkMassEmoji(message, settings) {
   const emojis = message.content.match(EMOJI_REGEX) || [];
-  
+
   if (emojis.length >= settings.mass_emoji_count) {
     return {
       type: 'mass_emoji',
@@ -392,7 +392,7 @@ function checkMassEmoji(message, settings) {
       deleteMessage: true
     };
   }
-  
+
   return null;
 }
 
@@ -401,10 +401,10 @@ function checkMassEmoji(message, settings) {
  */
 function checkSpoilers(message, settings) {
   const matches = message.content.match(SPOILER_REGEX);
-  
+
   if (matches) {
     const totalSpoilerLength = matches.reduce((sum, m) => sum + m.length - 4, 0); // -4 for |||| markers
-    
+
     if (totalSpoilerLength >= settings.spoilers_min_chars) {
       return {
         type: 'spoilers',
@@ -414,7 +414,7 @@ function checkSpoilers(message, settings) {
       };
     }
   }
-  
+
   return null;
 }
 
@@ -423,22 +423,22 @@ function checkSpoilers(message, settings) {
  */
 async function checkInvites(message, settings, client) {
   const inviteMatches = message.content.match(INVITE_REGEX);
-  
-  if (!inviteMatches) return null;
-  
+
+  if (!inviteMatches) {return null;}
+
   // If ignoring partner/verified, we need to check the invites
   if (settings.invites_ignore_partners || settings.invites_ignore_verified) {
     for (const inviteMatch of inviteMatches) {
       try {
         const code = inviteMatch.split('/').pop();
         const invite = await client.fetchInvite(code).catch(() => null);
-        
-        if (invite && invite.guild) {
-          const features = invite.guild.features || [];
-          if (settings.invites_ignore_partners && features.includes('PARTNERED')) continue;
-          if (settings.invites_ignore_verified && features.includes('VERIFIED')) continue;
-        }
-        
+
+        if (!invite || !invite.guild) { continue; }
+
+        const features = invite.guild.features || [];
+        if (settings.invites_ignore_partners && features.includes('PARTNERED')) { continue; }
+        if (settings.invites_ignore_verified && features.includes('VERIFIED')) { continue; }
+
         // This invite is not exempt
         return {
           type: 'invite',
@@ -458,7 +458,7 @@ async function checkInvites(message, settings, client) {
     }
     return null;
   }
-  
+
   return {
     type: 'invite',
     action: settings.invites_action,
@@ -472,20 +472,20 @@ async function checkInvites(message, settings, client) {
  */
 function checkLinks(message, settings) {
   const urls = message.content.match(URL_REGEX);
-  
-  if (!urls || urls.length === 0) return null;
-  
+
+  if (!urls || urls.length === 0) {return null;}
+
   const whitelist = settings.links_whitelist || [];
-  
+
   for (const url of urls) {
     try {
       const urlObj = new URL(url);
       const domain = urlObj.hostname.replace('www.', '');
-      
-      const isWhitelisted = whitelist.some(w => 
+
+      const isWhitelisted = whitelist.some(w =>
         domain === w || domain.endsWith('.' + w)
       );
-      
+
       // In whitelist mode: only allow whitelisted domains
       // In blacklist mode (default): allow everything except blocked
       if (settings.links_whitelist_mode) {
@@ -517,7 +517,7 @@ function checkLinks(message, settings) {
       };
     }
   }
-  
+
   return null;
 }
 
@@ -525,28 +525,28 @@ function checkLinks(message, settings) {
  * Check for blocked file extensions (supports whitelist/blacklist mode)
  */
 function checkFileExtensions(message, settings) {
-  if (message.attachments.size === 0) return null;
-  
+  if (message.attachments.size === 0) {return null;}
+
   const extensionsList = settings.file_extensions_list || [];
-  if (extensionsList.length === 0) return null;
-  
+  if (extensionsList.length === 0) {return null;}
+
   const isWhitelistMode = settings.file_extensions_whitelist_mode;
-  
+
   for (const attachment of message.attachments.values()) {
     const fileName = attachment.name.toLowerCase();
     const ext = '.' + fileName.split('.').pop();
-    
-    const matchesExtension = extensionsList.some(listed => 
+
+    const matchesExtension = extensionsList.some(listed =>
       fileName.endsWith(listed) || ext === listed || ext === '.' + listed.replace(/^\./, '')
     );
-    
+
     // In whitelist mode: block if NOT in list
     // In blacklist mode: block if IS in list
     if (isWhitelistMode ? !matchesExtension : matchesExtension) {
-      const reason = isWhitelistMode 
+      const reason = isWhitelistMode
         ? `File type not allowed (${ext})`
         : `Blocked file type (${ext})`;
-      
+
       return {
         type: 'file_extension',
         action: settings.file_extensions_action,
@@ -555,7 +555,7 @@ function checkFileExtensions(message, settings) {
       };
     }
   }
-  
+
   return null;
 }
 
@@ -571,7 +571,7 @@ function checkStickers(message, settings) {
       deleteMessage: true
     };
   }
-  
+
   return null;
 }
 
@@ -580,7 +580,7 @@ function checkStickers(message, settings) {
  */
 function checkZalgo(message, settings) {
   const zalgoChars = message.content.match(ZALGO_REGEX);
-  
+
   // If more than 10% of characters are zalgo combining marks
   if (zalgoChars && zalgoChars.length > message.content.length * 0.1) {
     return {
@@ -590,7 +590,7 @@ function checkZalgo(message, settings) {
       deleteMessage: true
     };
   }
-  
+
   return null;
 }
 
@@ -606,7 +606,7 @@ function checkPhoneNumbers(message, settings) {
       deleteMessage: true
     };
   }
-  
+
   return null;
 }
 
@@ -622,7 +622,7 @@ function checkMarkdownHeaders(message, settings) {
       deleteMessage: true
     };
   }
-  
+
   return null;
 }
 
@@ -631,18 +631,18 @@ function checkMarkdownHeaders(message, settings) {
  */
 async function handleViolation(message, violation, settings, client) {
   const { type, action, reason } = violation;
-  
+
   logger.info(`AutoMod: ${type} violation by ${message.author.tag} in ${message.guild.name} - Action: ${action}`);
-  
+
   // Determine if message should be deleted based on action
   const shouldDelete = action.includes('delete') || action === 'ban';
-  
+
   try {
     // Delete message if needed
     if (shouldDelete && message.deletable) {
       await message.delete().catch(() => {});
     }
-    
+
     // Log the mod action
     db.logModAction(
       message.guild.id,
@@ -651,46 +651,46 @@ async function handleViolation(message, violation, settings, client) {
       `automod_${type}`,
       reason
     );
-    
+
     // Perform the action
     switch (action) {
       case 'delete':
         // Already deleted above
         break;
-        
+
       case 'warn':
         await sendWarning(message, reason);
         db.addWarning(message.guild.id, message.author.id, client.user.id, `[AutoMod] ${reason}`);
         break;
-        
+
       case 'delete_warn':
         await sendWarning(message, reason);
         db.addWarning(message.guild.id, message.author.id, client.user.id, `[AutoMod] ${reason}`);
         break;
-        
+
       case 'delete_timeout':
         await timeoutUser(message, reason, 60 * 60 * 1000); // 1 hour
         break;
-        
+
       case 'delete_kick':
         await kickUser(message, reason, false);
         break;
-        
+
       case 'delete_kick_warn':
         db.addWarning(message.guild.id, message.author.id, client.user.id, `[AutoMod] ${reason}`);
         await kickUser(message, reason, true);
         break;
-        
+
       case 'ban':
         await banUser(message, reason);
         break;
     }
-    
+
     // Send to automod log channel if configured
     if (settings.log_channel) {
       await sendAutomodLog(message, violation, settings.log_channel, client);
     }
-    
+
   } catch (error) {
     logger.error(`AutoMod action error: ${error.message}`);
   }
@@ -739,7 +739,7 @@ async function kickUser(message, reason, warned = false) {
       await message.author.send({
         content: `You have been kicked from **${message.guild.name}** by AutoMod.\nReason: ${reason}`
       }).catch(() => {});
-      
+
       await message.member.kick(`[AutoMod] ${reason}`);
       const warnText = warned ? ' (+ warning added)' : '';
       await message.channel.send({
@@ -761,7 +761,7 @@ async function banUser(message, reason) {
       await message.author.send({
         content: `You have been banned from **${message.guild.name}** by AutoMod.\nReason: ${reason}`
       }).catch(() => {});
-      
+
       await message.member.ban({ reason: `[AutoMod] ${reason}`, deleteMessageSeconds: 24 * 60 * 60 }); // 24 hours
       await message.channel.send({
         content: `🔨 ${message.author.tag} has been banned by AutoMod. Reason: ${reason}`,
@@ -779,8 +779,8 @@ async function banUser(message, reason) {
 async function sendAutomodLog(message, violation, channelId, client) {
   try {
     const channel = await client.channels.fetch(channelId).catch(() => null);
-    if (!channel) return;
-    
+    if (!channel) {return;}
+
     const actionColors = {
       delete: 0xfee75c,        // Yellow
       warn: 0xf97316,          // Orange
@@ -790,7 +790,7 @@ async function sendAutomodLog(message, violation, channelId, client) {
       delete_kick_warn: 0xed4245, // Red
       ban: 0x000000            // Black
     };
-    
+
     const actionEmojis = {
       delete: '🗑️',
       warn: '⚠️',
@@ -800,7 +800,7 @@ async function sendAutomodLog(message, violation, channelId, client) {
       delete_kick_warn: '👢⚠️',
       ban: '🔨'
     };
-    
+
     const actionLabels = {
       delete: 'Delete Message',
       warn: 'Warn User',
@@ -810,9 +810,9 @@ async function sendAutomodLog(message, violation, channelId, client) {
       delete_kick_warn: 'Delete & Kick + Warn',
       ban: 'Ban (Delete 24h)'
     };
-    
+
     const shouldDelete = violation.action.includes('delete') || violation.action === 'ban';
-    
+
     const embed = new EmbedBuilder()
       .setColor(actionColors[violation.action] || 0xed4245)
       .setTitle(`${actionEmojis[violation.action] || '🛡️'} AutoMod: ${violation.type.replace(/_/g, ' ').toUpperCase()}`)
@@ -826,14 +826,14 @@ async function sendAutomodLog(message, violation, channelId, client) {
       .setThumbnail(message.author.displayAvatarURL({ dynamic: true }))
       .setTimestamp()
       .setFooter({ text: 'ShaggyBot AutoMod' });
-    
+
     if (shouldDelete && message.content) {
       embed.addFields({
         name: 'Deleted Message',
         value: message.content.substring(0, 1000) || '[No text content]'
       });
     }
-    
+
     await channel.send({ embeds: [embed] });
   } catch (error) {
     logger.error(`Failed to send automod log: ${error.message}`);

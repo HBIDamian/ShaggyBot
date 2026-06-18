@@ -61,9 +61,9 @@ async function loadFromCache() {
     const domains = data.split('\n')
       .map(line => line.trim().toLowerCase())
       .filter(line => line && !line.startsWith('#'));
-    
+
     phishingDomains = new Set(domains);
-    
+
     // Get file modification time as last update
     const stats = fs.statSync(CACHE_FILE);
     lastUpdate = stats.mtimeMs;
@@ -123,7 +123,7 @@ async function downloadList() {
       }
 
       let data = '';
-      
+
       response.on('data', chunk => {
         data += chunk;
       });
@@ -196,14 +196,14 @@ function startUpdateTimer() {
  */
 function containsPhishing(text) {
   const lowerText = text.toLowerCase();
-  
+
   // Check each phishing domain
   for (const domain of phishingDomains) {
     if (lowerText.includes(domain)) {
       return true;
     }
   }
-  
+
   return false;
 }
 

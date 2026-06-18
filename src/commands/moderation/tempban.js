@@ -48,7 +48,7 @@ module.exports = {
     }
 
     const targetMember = await interaction.guild.members.fetch(user.id).catch(() => null);
-    
+
     const error = runModerationChecks({
       targetUser: user,
       executor: interaction.user,
@@ -58,15 +58,15 @@ module.exports = {
       action: 'tempban',
       requireBannable: true
     });
-    
-    if (error) return replyError(interaction, error);
+
+    if (error) {return replyError(interaction, error);}
 
     try {
       const unbanAt = Date.now() + duration;
       const fullReason = `[TEMPBAN: Expires <t:${Math.floor(unbanAt / 1000)}:R>] ${reason} | By ${interaction.user.tag}`;
-      
+
       markBotAction(interaction.guildId, user.id, 'ban');
-      
+
       await sendPunishmentNotification({
         guild: interaction.guild,
         user,
@@ -85,7 +85,7 @@ module.exports = {
           markBotAction(interaction.guildId, user.id, 'unban');
           await interaction.guild.members.unban(user.id, 'Tempban expired');
           db.removeTempban(interaction.guildId, user.id);
-        } catch (e) {
+        } catch (_e) {
           // User may have been manually unbanned
         }
       }, duration);

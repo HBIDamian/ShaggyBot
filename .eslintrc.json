@@ -1,0 +1,46 @@
+{
+  "env": {
+    "node": true,
+    "es2022": true
+  },
+  "extends": [
+    "eslint:recommended"
+  ],
+  "parserOptions": {
+    "ecmaVersion": 2022
+  },
+  "rules": {
+    "no-var": "error",
+    "prefer-const": "error",
+    "no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
+    "no-throw-literal": "error",
+    "no-eval": "error",
+    "no-implied-eval": "error",
+    "eqeqeq": ["error", "always"],
+    "no-console": "off",
+    "no-multiple-empty-lines": ["warn", { "max": 1 }],
+    "no-trailing-spaces": "warn",
+    "semi": ["warn", "always"],
+    "curly": ["warn", "all"],
+    "arrow-body-style": ["warn", "as-needed"],
+    "prefer-arrow-callback": "warn",
+    "no-unused-expressions": "error",
+    "no-floating-decimal": "error",
+    "no-new-wrappers": "error",
+    "no-return-await": "off",
+    "require-await": "off",
+    "no-async-promise-executor": "error",
+    "no-promise-executor-return": "error",
+    "max-params": ["warn", 5],
+    "max-depth": ["warn", 4],
+    "complexity": ["warn", 15]
+  },
+  "overrides": [
+    {
+      "files": ["src/commands/**/*.js", "src/events/**/*.js", "src/contextMenus/**/*.js"],
+      "rules": {
+        "no-unused-vars": ["warn", { "argsIgnorePattern": "^(interaction|client|message)$" }]
+      }
+    }
+  ]
+}

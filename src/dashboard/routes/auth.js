@@ -14,8 +14,8 @@ const USERS_ME_GUILDS = `${DISCORD_API}/users/@me/guilds`;
 
 const CLIENT_ID = process.env.DISCORD_CLIENT_ID;
 const CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
-const REDIRECT_URI = process.env.DASHBOARD_URL 
-  ? `${process.env.DASHBOARD_URL}/auth/callback` 
+const REDIRECT_URI = process.env.DASHBOARD_URL
+  ? `${process.env.DASHBOARD_URL}/auth/callback`
   : 'http://localhost:3000/auth/callback';
 
 const SCOPES = 'identify guilds';
@@ -109,7 +109,7 @@ router.get('/callback', async (req, res) => {
  */
 router.get('/logout', (req, res) => {
   const username = req.session.user?.username;
-  
+
   req.session.destroy((err) => {
     if (err) {
       logger.error(`Logout error: ${err.message}`);
@@ -127,7 +127,7 @@ router.get('/me', (req, res) => {
   if (!req.session.user) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
-  
+
   res.json({
     user: req.session.user,
     guilds: req.session.guilds

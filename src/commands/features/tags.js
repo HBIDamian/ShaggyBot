@@ -8,7 +8,7 @@ const db = require('../../database/database');
  * @returns {boolean}
  */
 function hasPermissionTier(member, tier) {
-  if (tier === 'users') return true;
+  if (tier === 'users') {return true;}
   if (tier === 'mods') {
     return member.permissions.has(PermissionFlagsBits.ModerateMembers) ||
            member.permissions.has(PermissionFlagsBits.ManageMessages) ||
@@ -127,9 +127,9 @@ module.exports = {
   async autocomplete(interaction) {
     const focusedValue = interaction.options.getFocused().toLowerCase();
     const subcommand = interaction.options.getSubcommand();
-    
+
     let tags;
-    
+
     // For transfer, only show user's own tags
     if (subcommand === 'transfer') {
       tags = db.getTagsByOwner(interaction.guildId, interaction.user.id);
@@ -145,12 +145,12 @@ module.exports = {
     } else {
       tags = db.getTags(interaction.guildId);
     }
-    
+
     const filtered = tags
       .filter(tag => tag.name.includes(focusedValue))
       .slice(0, 25)
       .map(tag => ({ name: tag.name, value: tag.name }));
-    
+
     await interaction.respond(filtered);
   },
 
@@ -184,22 +184,22 @@ module.exports = {
 
 async function handleList(interaction) {
   const tags = db.getTags(interaction.guildId);
-  
+
   if (tags.length === 0) {
     return interaction.reply({
       content: '📭 No tags have been created in this server yet.\nUse `/tags create` to create one!',
       flags: MessageFlags.Ephemeral
     });
   }
-  
+
   const tagList = tags.map(t => `\`${t.name}\``).join(', ');
-  
+
   const embed = new EmbedBuilder()
     .setTitle('🏷️ Server Tags')
     .setDescription(tagList.length > 4000 ? tagList.substring(0, 4000) + '...' : tagList)
     .setColor(0x6366f1)
     .setFooter({ text: `${tags.length} tags total • Use /tag <name> to use a tag` });
-  
+
   await interaction.reply({ embeds: [embed] });
 }
 
@@ -217,7 +217,7 @@ async function handleCreate(interaction) {
   const modal = new ModalBuilder()
     .setCustomId('tag_create_modal')
     .setTitle('Create New Tag');
-  
+
   const nameInput = new TextInputBuilder()
     .setCustomId('tag_name')
     .setLabel('Tag Name')
@@ -225,7 +225,7 @@ async function handleCreate(interaction) {
     .setPlaceholder('e.g., rules, faq, welcome')
     .setMaxLength(32)
     .setRequired(true);
-  
+
   const responseInput = new TextInputBuilder()
     .setCustomId('tag_response')
     .setLabel('Response')
@@ -233,29 +233,29 @@ async function handleCreate(interaction) {
     .setPlaceholder('Enter the tag response...')
     .setMaxLength(2000)
     .setRequired(true);
-  
+
   modal.addComponents(
     new ActionRowBuilder().addComponents(nameInput),
     new ActionRowBuilder().addComponents(responseInput)
   );
-  
+
   await interaction.showModal(modal);
 }
 
 async function handleEdit(interaction) {
   const tagName = interaction.options.getString('tag').toLowerCase();
   const tag = db.getTag(interaction.guildId, tagName);
-  
+
   if (!tag) {
     return interaction.reply({ content: `❌ Tag \`${tagName}\` not found.`, flags: MessageFlags.Ephemeral });
   }
-  
+
   // Check permissions using tier settings
   const perms = getTagPermissions(interaction.guildId);
   const isOwner = tag.owner_id === interaction.user.id;
   const canManageOwn = hasPermissionTier(interaction.member, perms.manageOwn);
   const canManageAll = hasPermissionTier(interaction.member, perms.manageAll);
-  
+
   if (!isOwner && !canManageAll) {
     return interaction.reply({ content: '❌ You can only edit your own tags.', flags: MessageFlags.Ephemeral });
   }
@@ -266,11 +266,11 @@ async function handleEdit(interaction) {
       flags: MessageFlags.Ephemeral
     });
   }
-  
+
   const modal = new ModalBuilder()
     .setCustomId(`tag_edit_modal_${tag.id}`)
     .setTitle('Edit Tag');
-  
+
   const nameInput = new TextInputBuilder()
     .setCustomId('tag_name')
     .setLabel('Tag Name')
@@ -278,7 +278,7 @@ async function handleEdit(interaction) {
     .setValue(tag.name)
     .setMaxLength(32)
     .setRequired(true);
-  
+
   const responseInput = new TextInputBuilder()
     .setCustomId('tag_response')
     .setLabel('Response')
@@ -286,29 +286,29 @@ async function handleEdit(interaction) {
     .setValue(tag.response)
     .setMaxLength(2000)
     .setRequired(true);
-  
+
   modal.addComponents(
     new ActionRowBuilder().addComponents(nameInput),
     new ActionRowBuilder().addComponents(responseInput)
   );
-  
+
   await interaction.showModal(modal);
 }
 
 async function handleDelete(interaction) {
   const tagName = interaction.options.getString('tag').toLowerCase();
   const tag = db.getTag(interaction.guildId, tagName);
-  
+
   if (!tag) {
     return interaction.reply({ content: `❌ Tag \`${tagName}\` not found.`, flags: MessageFlags.Ephemeral });
   }
-  
+
   // Check permissions using tier settings
   const perms = getTagPermissions(interaction.guildId);
   const isOwner = tag.owner_id === interaction.user.id;
   const canManageOwn = hasPermissionTier(interaction.member, perms.manageOwn);
   const canManageAll = hasPermissionTier(interaction.member, perms.manageAll);
-  
+
   if (!isOwner && !canManageAll) {
     return interaction.reply({ content: '❌ You can only delete your own tags.', flags: MessageFlags.Ephemeral });
   }
@@ -319,9 +319,9 @@ async function handleDelete(interaction) {
       flags: MessageFlags.Ephemeral
     });
   }
-  
+
   db.deleteTag(tag.id);
-  
+
   await interaction.reply({
     content: `✅ Tag \`${tagName}\` has been deleted.`,
     flags: MessageFlags.Ephemeral
@@ -331,11 +331,11 @@ async function handleDelete(interaction) {
 async function handleInfo(interaction) {
   const tagName = interaction.options.getString('tag').toLowerCase();
   const tag = db.getTag(interaction.guildId, tagName);
-  
+
   if (!tag) {
     return interaction.reply({ content: `❌ Tag \`${tagName}\` not found.`, flags: MessageFlags.Ephemeral });
   }
-  
+
   const embed = new EmbedBuilder()
     .setTitle(`🏷️ Tag: ${tag.name}`)
     .addFields(
@@ -345,26 +345,26 @@ async function handleInfo(interaction) {
     )
     .setColor(0x6366f1)
     .setFooter({ text: `Tag ID: ${tag.id}` });
-  
+
   await interaction.reply({ embeds: [embed] });
 }
 
 async function handleRaw(interaction) {
   const tagName = interaction.options.getString('tag').toLowerCase();
   const tag = db.getTag(interaction.guildId, tagName);
-  
+
   if (!tag) {
     return interaction.reply({ content: `❌ Tag \`${tagName}\` not found.`, flags: MessageFlags.Ephemeral });
   }
-  
-  // Escape markdown
-  const escaped = tag.response
+
+  // Escape markdown (pre-computed for future use)
+  const _escaped = tag.response
     .replace(/`/g, '\\`')
     .replace(/\*/g, '\\*')
     .replace(/_/g, '\\_')
     .replace(/~/g, '\\~')
     .replace(/\|/g, '\\|');
-  
+
   await interaction.reply({
     content: `**Raw content of \`${tag.name}\`:**\n\`\`\`\n${tag.response}\n\`\`\``,
     flags: MessageFlags.Ephemeral
@@ -374,23 +374,23 @@ async function handleRaw(interaction) {
 async function handleUser(interaction) {
   const user = interaction.options.getUser('user');
   const tags = db.getTagsByOwner(interaction.guildId, user.id);
-  
+
   if (tags.length === 0) {
     return interaction.reply({
       content: `📭 ${user.username} hasn't created any tags in this server.`,
       flags: MessageFlags.Ephemeral
     });
   }
-  
+
   const tagList = tags.map(t => `\`${t.name}\` (${t.uses} uses)`).join('\n');
-  
+
   const embed = new EmbedBuilder()
     .setTitle(`🏷️ Tags by ${user.username}`)
     .setDescription(tagList.length > 4000 ? tagList.substring(0, 4000) + '...' : tagList)
     .setColor(0x6366f1)
     .setThumbnail(user.displayAvatarURL())
     .setFooter({ text: `${tags.length} tags total` });
-  
+
   await interaction.reply({ embeds: [embed] });
 }
 
@@ -398,21 +398,21 @@ async function handleTransfer(interaction) {
   const tagName = interaction.options.getString('tag').toLowerCase();
   const newOwner = interaction.options.getUser('user');
   const tag = db.getTag(interaction.guildId, tagName);
-  
+
   if (!tag) {
     return interaction.reply({ content: `❌ Tag \`${tagName}\` not found.`, flags: MessageFlags.Ephemeral });
   }
-  
+
   if (tag.owner_id !== interaction.user.id) {
     return interaction.reply({ content: '❌ You can only transfer your own tags.', flags: MessageFlags.Ephemeral });
   }
-  
+
   if (newOwner.bot) {
     return interaction.reply({ content: '❌ You cannot transfer tags to bots.', flags: MessageFlags.Ephemeral });
   }
-  
+
   db.transferTag(tag.id, newOwner.id, newOwner.username);
-  
+
   await interaction.reply({
     content: `✅ Tag \`${tagName}\` has been transferred to ${newOwner}.`
   });
@@ -425,9 +425,9 @@ async function handleNuke(interaction) {
       flags: MessageFlags.Ephemeral
     });
   }
-  
+
   const count = db.nukeTags(interaction.guildId);
-  
+
   await interaction.reply({
     content: `🗑️ Deleted **${count}** tags from this server.`,
     flags: MessageFlags.Ephemeral
@@ -441,10 +441,10 @@ async function handlePrune(interaction) {
       flags: MessageFlags.Ephemeral
     });
   }
-  
+
   const user = interaction.options.getUser('user');
   const count = db.pruneTagsByUser(interaction.guildId, user.id);
-  
+
   await interaction.reply({
     content: `🗑️ Deleted **${count}** tags from ${user}.`,
     flags: MessageFlags.Ephemeral

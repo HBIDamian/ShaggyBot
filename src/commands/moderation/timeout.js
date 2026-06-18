@@ -57,17 +57,17 @@ module.exports = {
       action: 'timeout',
       requireInGuild: true
     });
-    
-    if (error) return replyError(interaction, error);
+
+    if (error) {return replyError(interaction, error);}
 
     try {
       markBotAction(interaction.guildId, user.id, 'timeout');
-      
+
       await targetMember.timeout(duration, `${reason} | By ${interaction.user.tag}`);
       db.logModAction(interaction.guildId, user.id, interaction.user.id, 'timeout', `${reason} (Duration: ${formatDuration(duration)})`);
 
       const expiresAt = Math.floor((Date.now() + duration) / 1000);
-      
+
       await sendPunishmentNotification({
         guild: interaction.guild,
         user,

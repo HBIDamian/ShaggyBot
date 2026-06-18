@@ -8,15 +8,15 @@ const logger = createLogger('MessageFeatures');
 const DISCORD_MESSAGE_LINK = /https?:\/\/(?:ptb\.|canary\.)?discord(?:app)?\.com\/channels\/(\d+)\/(\d+)\/(\d+)/gi;
 
 // GitHub file link with line numbers regex
-const GITHUB_FILE_LINK = /https?:\/\/github\.com\/([^\/]+)\/([^\/]+)\/blob\/([^\/]+)\/(.+?)(?:#L(\d+)(?:-L(\d+))?)?(?:\s|$)/gi;
+const GITHUB_FILE_LINK = /https?:\/\/github\.com\/([^/]+)\/([^/]+)\/blob\/([^/]+)\/(.+?)(?:#L(\d+)(?:-L(\d+))?)?(?:\s|$)/gi;
 
 module.exports = {
   name: Events.MessageCreate,
   once: false,
-  
+
   async execute(message, client) {
     // Skip bot messages and DMs
-    if (message.author.bot || !message.guild) return;
+    if (message.author.bot || !message.guild) {return;}
 
     // Get guild settings
     const settings = db.getGuildSettings(message.guild.id);
@@ -38,24 +38,24 @@ module.exports = {
  */
 async function handleAutoQuoter(message, client) {
   const links = [...message.content.matchAll(DISCORD_MESSAGE_LINK)];
-  
-  if (links.length === 0) return;
+
+  if (links.length === 0) {return;}
 
   for (const match of links.slice(0, 3)) { // Limit to 3 quotes per message
     const [, guildId, channelId, messageId] = match;
-    
+
     try {
       // Get the guild
       const targetGuild = client.guilds.cache.get(guildId);
-      if (!targetGuild) continue;
+      if (!targetGuild) {continue;}
 
       // Get the channel
       const targetChannel = targetGuild.channels.cache.get(channelId);
-      if (!targetChannel) continue;
+      if (!targetChannel) {continue;}
 
       // Fetch the message
       const targetMessage = await targetChannel.messages.fetch(messageId).catch(() => null);
-      if (!targetMessage) continue;
+      if (!targetMessage) {continue;}
 
       // Build the quote embed
       const embed = new EmbedBuilder()
@@ -69,13 +69,13 @@ async function handleAutoQuoter(message, client) {
 
       // Add message content
       if (targetMessage.content) {
-        embed.setDescription(targetMessage.content.length > 4000 
-          ? targetMessage.content.slice(0, 4000) + '...' 
+        embed.setDescription(targetMessage.content.length > 4000
+          ? targetMessage.content.slice(0, 4000) + '...'
           : targetMessage.content);
       }
 
       // Add first image attachment if present
-      const imageAttachment = targetMessage.attachments.find(att => 
+      const imageAttachment = targetMessage.attachments.find(att =>
         att.contentType?.startsWith('image/')
       );
       if (imageAttachment) {
@@ -104,24 +104,24 @@ async function handleAutoQuoter(message, client) {
  */
 async function handleGitPreviewer(message) {
   const links = [...message.content.matchAll(GITHUB_FILE_LINK)];
-  
-  if (links.length === 0) return;
+
+  if (links.length === 0) {return;}
 
   for (const match of links.slice(0, 2)) { // Limit to 2 previews per message
     const [fullMatch, owner, repo, branch, filePath, startLine, endLine] = match;
-    
+
     try {
       // Build raw file URL
       const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${filePath}`;
-      
+
       // Fetch the file content
       const response = await fetch(rawUrl, {
         headers: {
           'User-Agent': 'ShaggyBot-Discord'
         }
       });
-      
-      if (!response.ok) continue;
+
+      if (!response.ok) {continue;}
 
       const content = await response.text();
       const lines = content.split('\n');
@@ -129,7 +129,7 @@ async function handleGitPreviewer(message) {
       // Determine line range
       let start = startLine ? parseInt(startLine) : 1;
       let end = endLine ? parseInt(endLine) : (startLine ? parseInt(startLine) : Math.min(15, lines.length));
-      
+
       // Limit preview to 25 lines max
       if (end - start > 25) {
         end = start + 25;
@@ -141,7 +141,7 @@ async function handleGitPreviewer(message) {
 
       // Extract the lines
       const codeLines = lines.slice(start - 1, end);
-      
+
       // Format with line numbers
       const formattedCode = codeLines
         .map((line, i) => `${String(start + i).padStart(3)} │ ${line}`)
@@ -149,7 +149,7 @@ async function handleGitPreviewer(message) {
 
       // Get file extension for syntax highlighting
       const extension = filePath.split('.').pop() || '';
-      
+
       // Determine language for code block
       const langMap = {
         'js': 'javascript',

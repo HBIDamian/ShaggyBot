@@ -1,11 +1,9 @@
-const { Events, Collection, PermissionFlagsBits, EmbedBuilder , MessageFlags } = require('discord.js');
+const { Events, Collection, PermissionFlagsBits, EmbedBuilder, MessageFlags } = require('discord.js');
 const { createLogger } = require('../utils/logger');
+const { interactionHandler } = require('../utils/errorHandler');
 const db = require('../database/database');
 
 const logger = createLogger('InteractionHandler');
-
-// Categories containing public (non-moderation) commands
-const PUBLIC_COMMAND_CATEGORIES = ['fun', 'utility', 'features'];
 
 /**
  * Check if a command is disabled and if the user can bypass it
@@ -16,25 +14,25 @@ const PUBLIC_COMMAND_CATEGORIES = ['fun', 'utility', 'features'];
 function checkCommandDisabled(interaction, commandName) {
   try {
     const settings = db.getCommandToggleSettings(interaction.guildId);
-    
+
     // Check if command is in the disabled list
     if (!settings.disabled_commands.includes(commandName)) {
       return false; // Command is not disabled
     }
-    
+
     // Command is disabled, check for bypasses
     const member = interaction.member;
-    
+
     // Check admin bypass
     if (settings.admins_bypass && member.permissions.has(PermissionFlagsBits.Administrator)) {
       return false; // Admin can bypass
     }
-    
+
     // Check mod bypass (Manage Messages permission)
     if (settings.mods_bypass && member.permissions.has(PermissionFlagsBits.ManageMessages)) {
       return false; // Mod can bypass
     }
-    
+
     // Command is disabled and user cannot bypass
     return true;
   } catch (err) {
@@ -45,32 +43,27 @@ function checkCommandDisabled(interaction, commandName) {
 
 module.exports = {
   name: Events.InteractionCreate,
-  async execute(interaction, client) {
-    // Handle slash commands
+  execute: interactionHandler(async (interaction, client) => {
     if (interaction.isChatInputCommand()) {
       return handleSlashCommand(interaction, client);
     }
-    
-    // Handle context menu commands (right-click apps)
+
     if (interaction.isMessageContextMenuCommand() || interaction.isUserContextMenuCommand()) {
       return handleContextMenuCommand(interaction, client);
     }
-    
-    // Handle button interactions
+
     if (interaction.isButton()) {
       return handleButtonInteraction(interaction, client);
     }
-    
-    // Handle autocomplete interactions
+
     if (interaction.isAutocomplete()) {
       return handleAutocomplete(interaction, client);
     }
-    
-    // Handle modal submissions
+
     if (interaction.isModalSubmit()) {
       return handleModalSubmit(interaction, client);
     }
-  },
+  }),
 };
 
 /**
@@ -78,15 +71,15 @@ module.exports = {
  */
 async function handleSlashCommand(interaction, client) {
     const command = client.commands.get(interaction.commandName);
-    
+
     if (!command) {
       logger.error(`No command matching ${interaction.commandName} was found.`);
-      return interaction.reply({ 
-        content: 'There was an error while executing this command!', 
-        flags: MessageFlags.Ephemeral 
+      return interaction.reply({
+        content: 'There was an error while executing this command!',
+        flags: MessageFlags.Ephemeral
       });
     }
-    
+
     // Check if command is disabled for this guild (only for guild commands)
     if (interaction.guildId) {
       const commandDisabled = checkCommandDisabled(interaction, command.data.name);
@@ -97,51 +90,35 @@ async function handleSlashCommand(interaction, client) {
         });
       }
     }
-    
+
     // Implement command cooldowns
     const { cooldowns } = client;
-    
+
     if (!cooldowns.has(command.data.name)) {
       cooldowns.set(command.data.name, new Collection());
     }
-    
+
     const now = Date.now();
     const timestamps = cooldowns.get(command.data.name);
     const defaultCooldownDuration = 3; // 3 seconds default cooldown
     const cooldownAmount = (command.cooldown ?? defaultCooldownDuration) * 1000;
-    
+
     if (timestamps.has(interaction.user.id)) {
       const expirationTime = timestamps.get(interaction.user.id) + cooldownAmount;
-      
+
       if (now < expirationTime) {
         const expiredTimestamp = Math.round(expirationTime / 1000);
-        return interaction.reply({ 
-          content: `Please wait, you are on a cooldown for \`${command.data.name}\`. You can use it again <t:${expiredTimestamp}:R>.`, 
-          flags: MessageFlags.Ephemeral 
+        return interaction.reply({
+          content: `Please wait, you are on a cooldown for \`${command.data.name}\`. You can use it again <t:${expiredTimestamp}:R>.`,
+          flags: MessageFlags.Ephemeral
         });
       }
     }
-    
+
     timestamps.set(interaction.user.id, now);
     setTimeout(() => timestamps.delete(interaction.user.id), cooldownAmount);
-    
-    try {
-      await command.execute(interaction);
-    } catch (error) {
-      logger.error(`Error executing ${interaction.commandName}: ${error.message}`);
-      
-      if (interaction.replied || interaction.deferred) {
-        await interaction.followUp({ 
-          content: 'There was an error while executing this command!', 
-          flags: MessageFlags.Ephemeral 
-        });
-      } else {
-        await interaction.reply({ 
-          content: 'There was an error while executing this command!', 
-          flags: MessageFlags.Ephemeral 
-        });
-      }
-    }
+
+    await command.execute(interaction);
 }
 
 /**
@@ -149,32 +126,16 @@ async function handleSlashCommand(interaction, client) {
  */
 async function handleContextMenuCommand(interaction, client) {
   const command = client.commands.get(interaction.commandName);
-  
+
   if (!command) {
     logger.error(`No context menu command matching ${interaction.commandName} was found.`);
-    return interaction.reply({ 
-      content: 'There was an error while executing this command!', 
-      flags: MessageFlags.Ephemeral 
+    return interaction.reply({
+      content: 'There was an error while executing this command!',
+      flags: MessageFlags.Ephemeral,
     });
   }
-  
-  try {
-    await command.execute(interaction);
-  } catch (error) {
-    logger.error(`Error executing context menu ${interaction.commandName}: ${error.message}`);
-    
-    if (interaction.replied || interaction.deferred) {
-      await interaction.followUp({ 
-        content: 'There was an error while executing this command!', 
-        flags: MessageFlags.Ephemeral 
-      });
-    } else {
-      await interaction.reply({ 
-        content: 'There was an error while executing this command!', 
-        flags: MessageFlags.Ephemeral 
-      });
-    }
-  }
+
+  await command.execute(interaction);
 }
 
 /**
@@ -182,23 +143,22 @@ async function handleContextMenuCommand(interaction, client) {
  */
 async function handleButtonInteraction(interaction, client) {
   const customId = interaction.customId;
-  
+
   // Handle view warnings button
   if (customId.startsWith('view_warnings_')) {
     return handleViewWarnings(interaction, customId.replace('view_warnings_', ''));
   }
-  
+
   // Handle warnings pagination buttons
   if (customId.startsWith('warnings_')) {
     return handleWarningsPagination(interaction, customId);
   }
-  
-  // Only handle report-related buttons
-  if (!customId.startsWith('report_')) return;
-  
-  const guild = interaction.guild;
+
+  if (!customId.startsWith('report_')) { return; }
+
+  const _guild = interaction.guild;
   const member = interaction.member;
-  
+
   // Check if user has moderation permissions
   if (!member.permissions.has(PermissionFlagsBits.ModerateMembers)) {
     return interaction.reply({
@@ -206,10 +166,10 @@ async function handleButtonInteraction(interaction, client) {
       flags: MessageFlags.Ephemeral
     });
   }
-  
+
   const parts = customId.split('_');
   const action = parts[1]; // delete, warn, timeout, dismiss, claim, finish
-  
+
   try {
     switch (action) {
       case 'delete':
@@ -249,31 +209,31 @@ async function handleButtonInteraction(interaction, client) {
  */
 async function handleReportDelete(interaction, channelId, messageId) {
   const channel = interaction.guild.channels.cache.get(channelId);
-  
+
   if (!channel) {
     return interaction.reply({
       content: '❌ The channel no longer exists.',
       flags: MessageFlags.Ephemeral
     });
   }
-  
+
   try {
     const message = await channel.messages.fetch(messageId);
     await message.delete();
-    
+
     // Update the embed to show the message was deleted
     const embed = EmbedBuilder.from(interaction.message.embeds[0]);
     const currentFields = embed.data.fields || [];
     const existingActionIndex = currentFields.findIndex(f => f.name === '📋 Actions Taken:');
-    
+
     if (existingActionIndex !== -1) {
       currentFields[existingActionIndex].value += `\n• Message deleted by <@${interaction.user.id}>`;
     } else {
       embed.addFields({ name: '📋 Actions Taken:', value: `• Message deleted by <@${interaction.user.id}>` });
     }
-    
+
     await interaction.update({ embeds: [embed] });
-    
+
     logger.info(`Report: Message ${messageId} deleted by ${interaction.user.tag}`);
   } catch (error) {
     if (error.code === 10008) {
@@ -291,31 +251,31 @@ async function handleReportDelete(interaction, channelId, messageId) {
  */
 async function handleReportWarn(interaction, userId, messageId) {
   const reason = `Warned via message report (Message ID: ${messageId})`;
-  
+
   db.addWarning(interaction.guild.id, userId, interaction.user.id, reason);
   db.logModAction(interaction.guild.id, userId, interaction.user.id, 'warn', reason);
-  
+
   // Update the embed
   const embed = EmbedBuilder.from(interaction.message.embeds[0]);
   const currentFields = embed.data.fields || [];
   const existingActionIndex = currentFields.findIndex(f => f.name === '📋 Actions Taken:');
-  
+
   if (existingActionIndex !== -1) {
     currentFields[existingActionIndex].value += `\n• User warned by <@${interaction.user.id}>`;
   } else {
     embed.addFields({ name: '📋 Actions Taken:', value: `• User warned by <@${interaction.user.id}>` });
   }
-  
+
   await interaction.update({ embeds: [embed] });
-  
+
   // Try to DM the user
   try {
     const user = await interaction.client.users.fetch(userId);
     await user.send(`⚠️ You have been warned in **${interaction.guild.name}** for a reported message.\nReason: ${reason}`);
-  } catch (e) {
+  } catch (_e) {
     // User has DMs disabled
   }
-  
+
   logger.info(`Report: User ${userId} warned by ${interaction.user.tag}`);
 }
 
@@ -324,48 +284,48 @@ async function handleReportWarn(interaction, userId, messageId) {
  */
 async function handleReportTimeout(interaction, userId, messageId) {
   const member = await interaction.guild.members.fetch(userId).catch(() => null);
-  
+
   if (!member) {
     return interaction.reply({
       content: '❌ The user is no longer in this server.',
       flags: MessageFlags.Ephemeral
     });
   }
-  
+
   if (!member.moderatable) {
     return interaction.reply({
       content: '❌ I cannot timeout this user. They may have higher permissions than me.',
       flags: MessageFlags.Ephemeral
     });
   }
-  
+
   const reason = `24h timeout via message report (Message ID: ${messageId})`;
   const duration = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
-  
+
   await member.timeout(duration, reason);
   db.logModAction(interaction.guild.id, userId, interaction.user.id, 'mute', reason);
-  
+
   // Update the embed
   const embed = EmbedBuilder.from(interaction.message.embeds[0]);
   const currentFields = embed.data.fields || [];
   const existingActionIndex = currentFields.findIndex(f => f.name === '📋 Actions Taken:');
-  
+
   if (existingActionIndex !== -1) {
     currentFields[existingActionIndex].value += `\n• User timed out 24h by <@${interaction.user.id}>`;
   } else {
     embed.addFields({ name: '📋 Actions Taken:', value: `• User timed out 24h by <@${interaction.user.id}>` });
   }
-  
+
   await interaction.update({ embeds: [embed] });
-  
+
   // Try to DM the user
   try {
     const user = await interaction.client.users.fetch(userId);
     await user.send(`🔇 You have been timed out for 24 hours in **${interaction.guild.name}** for a reported message.`);
-  } catch (e) {
+  } catch (_e) {
     // User has DMs disabled
   }
-  
+
   logger.info(`Report: User ${userId} timed out 24h by ${interaction.user.tag}`);
 }
 
@@ -383,7 +343,7 @@ async function handleReportDismiss(interaction) {
 async function handleReportClaim(interaction) {
   const embed = EmbedBuilder.from(interaction.message.embeds[0]);
   const currentFields = embed.data.fields || [];
-  
+
   // Check if already claimed
   const claimedIndex = currentFields.findIndex(f => f.name === '👤 Claimed By:');
   if (claimedIndex !== -1) {
@@ -392,12 +352,12 @@ async function handleReportClaim(interaction) {
       flags: MessageFlags.Ephemeral
     });
   }
-  
+
   embed.addFields({ name: '👤 Claimed By:', value: `<@${interaction.user.id}>` });
   embed.setColor(0x3B82F6); // Blue to indicate in progress
-  
+
   await interaction.update({ embeds: [embed] });
-  
+
   logger.info(`Report claimed by ${interaction.user.tag}`);
 }
 
@@ -406,19 +366,19 @@ async function handleReportClaim(interaction) {
  */
 async function handleReportFinish(interaction) {
   const embed = EmbedBuilder.from(interaction.message.embeds[0]);
-  
+
   embed.setColor(0x22C55E); // Green to indicate resolved
   embed.setFooter({
     text: `✅ Resolved by ${interaction.user.username} • ${new Date().toLocaleString()}`,
     iconURL: interaction.user.displayAvatarURL({ dynamic: true })
   });
-  
+
   // Remove action buttons, keep only info
-  await interaction.update({ 
+  await interaction.update({
     embeds: [embed],
     components: []
   });
-  
+
   logger.info(`Report marked as finished by ${interaction.user.tag}`);
 }
 
@@ -427,11 +387,11 @@ async function handleReportFinish(interaction) {
  */
 async function handleAutocomplete(interaction, client) {
   const command = client.commands.get(interaction.commandName);
-  
+
   if (!command || !command.autocomplete) {
     return;
   }
-  
+
   try {
     await command.autocomplete(interaction);
   } catch (error) {
@@ -443,7 +403,7 @@ async function handleAutocomplete(interaction, client) {
  * Check if user has permission based on tier setting
  */
 function hasTagPermissionTier(member, tier) {
-  if (tier === 'users') return true;
+  if (tier === 'users') {return true;}
   if (tier === 'mods') {
     return member.permissions.has(PermissionFlagsBits.ModerateMembers) ||
            member.permissions.has(PermissionFlagsBits.ManageMessages) ||
@@ -460,7 +420,7 @@ function hasTagPermissionTier(member, tier) {
  */
 async function handleModalSubmit(interaction, client) {
   const customId = interaction.customId;
-  
+
   try {
     // Handle report user modal
     if (customId.startsWith('report_user_modal_')) {
@@ -470,7 +430,7 @@ async function handleModalSubmit(interaction, client) {
         return reportUserCommand.handleModalSubmit(interaction, targetUserId);
       }
     }
-    
+
     // Handle tag create modal
     if (customId === 'tag_create_modal') {
       // Check permission tier for creating tags
@@ -486,7 +446,7 @@ async function handleModalSubmit(interaction, client) {
 
       const tagName = interaction.fields.getTextInputValue('tag_name').toLowerCase().trim();
       const response = interaction.fields.getTextInputValue('tag_response');
-      
+
       // Validate tag name
       if (!/^[a-z0-9-_]+$/.test(tagName)) {
         return interaction.reply({
@@ -494,7 +454,7 @@ async function handleModalSubmit(interaction, client) {
           flags: MessageFlags.Ephemeral
         });
       }
-      
+
       // Check if tag already exists
       const existing = db.getTag(interaction.guildId, tagName);
       if (existing) {
@@ -503,25 +463,25 @@ async function handleModalSubmit(interaction, client) {
           flags: MessageFlags.Ephemeral
         });
       }
-      
+
       // Create the tag
       db.createTag(interaction.guildId, tagName, response, interaction.user.id, interaction.user.username);
-      
+
       return interaction.reply({
         content: `✅ Tag \`${tagName}\` has been created! Use \`/tag ${tagName}\` to display it.`,
         flags: MessageFlags.Ephemeral
       });
     }
-    
+
     // Handle tag edit modal
     if (customId.startsWith('tag_edit_modal_')) {
       const tagId = customId.replace('tag_edit_modal_', '');
       const currentTag = db.getTagById(tagId);
-      
+
       if (!currentTag) {
         return interaction.reply({ content: '❌ Tag not found.', flags: MessageFlags.Ephemeral });
       }
-      
+
       // Check permission tier for editing tags
       const settings = db.getGuildSettings(interaction.guildId);
       const manageOwn = settings.tags_manage_own || 'users';
@@ -529,7 +489,7 @@ async function handleModalSubmit(interaction, client) {
       const isOwner = currentTag.owner_id === interaction.user.id;
       const canManageOwn = hasTagPermissionTier(interaction.member, manageOwn);
       const canManageAll = hasTagPermissionTier(interaction.member, manageAll);
-      
+
       if (!isOwner && !canManageAll) {
         return interaction.reply({ content: '❌ You can only edit your own tags.', flags: MessageFlags.Ephemeral });
       }
@@ -543,7 +503,7 @@ async function handleModalSubmit(interaction, client) {
 
       const newName = interaction.fields.getTextInputValue('tag_name').toLowerCase().trim();
       const newResponse = interaction.fields.getTextInputValue('tag_response');
-      
+
       // Validate tag name
       if (!/^[a-z0-9-_]+$/.test(newName)) {
         return interaction.reply({
@@ -551,20 +511,20 @@ async function handleModalSubmit(interaction, client) {
           flags: MessageFlags.Ephemeral
         });
       }
-      
+
       // Check if new name conflicts with existing tag
       const existing = db.getTag(interaction.guildId, newName);
-      
+
       if (existing && existing.id !== parseInt(tagId)) {
         return interaction.reply({
           content: `❌ A tag with the name \`${newName}\` already exists.`,
           flags: MessageFlags.Ephemeral
         });
       }
-      
+
       // Update the tag
       db.updateTag(tagId, newName, newResponse);
-      
+
       return interaction.reply({
         content: `✅ Tag has been updated to \`${newName}\`!`,
         flags: MessageFlags.Ephemeral
@@ -587,7 +547,7 @@ async function handleModalSubmit(interaction, client) {
 async function handleViewWarnings(interaction, userId) {
   try {
     const { buildWarningsEmbed, buildPaginationButtons } = require('../commands/moderation/warnings');
-    
+
     const warnings = db.getUserWarnings(interaction.guildId, userId);
     const user = await interaction.client.users.fetch(userId).catch(() => null);
     const username = user ? user.username : 'Unknown User';
@@ -618,7 +578,7 @@ async function handleViewWarnings(interaction, userId) {
 async function handleWarningsPagination(interaction, customId) {
   try {
     const { buildWarningsEmbed, buildPaginationButtons, WARNINGS_PER_PAGE } = require('../commands/moderation/warnings');
-    
+
     const parts = customId.split('_');
     const action = parts[1]; // first, prev, close, next, last
     const userId = parts[2];
@@ -626,14 +586,14 @@ async function handleWarningsPagination(interaction, customId) {
 
     // Handle close button
     if (action === 'close') {
-      return interaction.update({ 
+      return interaction.update({
         components: [] // Remove buttons
       });
     }
 
     const warnings = db.getUserWarnings(interaction.guildId, userId);
     const user = await interaction.client.users.fetch(userId).catch(() => null);
-    
+
     if (!user || warnings.length === 0) {
       return interaction.update({
         content: '❌ Unable to fetch warnings.',

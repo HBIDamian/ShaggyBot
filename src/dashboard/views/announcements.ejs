@@ -19,9 +19,9 @@
           <p class="text-zinc-400 text-sm md:text-base">Have the bot automatically send messages to any channel on a one-time or recurring schedule.</p>
         </div>
 
-        <!-- CREATE NEW ANNOUNCEMENT -->
+        <!-- CREATE / EDIT ANNOUNCEMENT -->
         <div class="bg-zinc-900 p-6 rounded-xl border border-zinc-800 mb-6">
-          <h3 class="font-semibold text-lg mb-4">➕ Create New Announcement</h3>
+          <h3 id="formTitle" class="font-semibold text-lg mb-4">➕ Create New Announcement</h3>
           <form id="createForm" class="space-y-4">
 
             <!-- Channel -->
@@ -51,20 +51,67 @@
             <!-- Embed fields (hidden by default) -->
             <div id="embedFields" class="hidden bg-zinc-800/40 rounded-xl p-4 space-y-3 border border-zinc-700">
               <p class="text-xs text-zinc-500 font-medium uppercase tracking-wide mb-2">Embed Options</p>
+
+              <!-- Title + URL -->
               <div>
-                <label class="block text-sm font-medium mb-1">Embed Title</label>
+                <label class="block text-sm font-medium mb-1">Title</label>
                 <input type="text" id="new_embed_title" placeholder="e.g. 📢 Weekly Announcement"
                   class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500 transition text-sm">
               </div>
               <div>
-                <label class="block text-sm font-medium mb-1">Embed Description</label>
+                <label class="block text-sm font-medium mb-1">Title URL <span class="text-xs text-zinc-600 font-normal">(makes title clickable)</span></label>
+                <input type="text" id="new_embed_url" placeholder="https://…"
+                  class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500 transition text-sm">
+              </div>
+              <div>
+                <label class="block text-sm font-medium mb-1">Description</label>
                 <textarea id="new_embed_description" rows="3" placeholder="Main body of the embed…"
                   class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500 transition resize-none text-sm"></textarea>
               </div>
+
+              <!-- Color + Timestamp -->
               <div class="grid grid-cols-2 gap-3">
                 <div>
                   <label class="block text-sm font-medium mb-1">Color (hex)</label>
                   <input type="text" id="new_embed_color" placeholder="#5865F2"
+                    class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500 transition text-sm">
+                </div>
+                <div class="flex items-end pb-2">
+                  <label class="flex items-center gap-2 cursor-pointer select-none">
+                    <input type="checkbox" id="new_embed_timestamp" class="sr-only peer">
+                    <div class="w-10 h-5 bg-zinc-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600 relative"></div>
+                    <span class="text-sm font-medium">Timestamp</span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Author -->
+              <div class="border-t border-zinc-700 pt-3">
+                <p class="text-xs text-zinc-500 font-medium uppercase tracking-wide mb-2">Author</p>
+                <div class="grid grid-cols-3 gap-3">
+                  <div>
+                    <label class="block text-sm font-medium mb-1">Name</label>
+                    <input type="text" id="new_embed_author_name" placeholder="Author name"
+                      class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500 transition text-sm">
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium mb-1">URL</label>
+                    <input type="text" id="new_embed_author_url" placeholder="https://…"
+                      class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500 transition text-sm">
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium mb-1">Icon URL</label>
+                    <input type="text" id="new_embed_author_icon" placeholder="https://…"
+                      class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500 transition text-sm">
+                  </div>
+                </div>
+              </div>
+
+              <!-- Thumbnail + Image -->
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-sm font-medium mb-1">Thumbnail URL</label>
+                  <input type="text" id="new_embed_thumbnail" placeholder="https://…"
                     class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500 transition text-sm">
                 </div>
                 <div>
@@ -72,6 +119,34 @@
                   <input type="text" id="new_embed_image" placeholder="https://…"
                     class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500 transition text-sm">
                 </div>
+              </div>
+
+              <!-- Footer -->
+              <div class="border-t border-zinc-700 pt-3">
+                <p class="text-xs text-zinc-500 font-medium uppercase tracking-wide mb-2">Footer</p>
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-sm font-medium mb-1">Text</label>
+                    <input type="text" id="new_embed_footer_text" placeholder="Footer text"
+                      class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500 transition text-sm">
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium mb-1">Icon URL</label>
+                    <input type="text" id="new_embed_footer_icon" placeholder="https://…"
+                      class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500 transition text-sm">
+                  </div>
+                </div>
+              </div>
+
+              <!-- Fields -->
+              <div class="border-t border-zinc-700 pt-3">
+                <div class="flex items-center justify-between mb-2">
+                  <p class="text-xs text-zinc-500 font-medium uppercase tracking-wide">Fields</p>
+                  <button type="button" onclick="addAnnouncementEmbedField()" class="text-xs text-indigo-400 hover:text-indigo-300 transition flex items-center gap-1">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg> Add
+                  </button>
+                </div>
+                <div id="new_embed_fields_container" class="space-y-2"></div>
               </div>
             </div>
 
@@ -89,9 +164,15 @@
             <!-- Dynamic schedule fields -->
             <div id="scheduleFields" class="space-y-3"></div>
 
-            <button type="submit" class="w-full px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 rounded-lg font-medium transition">
-              Create Announcement
-            </button>
+            <div class="flex gap-3">
+              <button type="submit" id="submitBtn" class="flex-1 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 rounded-lg font-medium transition">
+                Create Announcement
+              </button>
+              <button type="button" id="cancelEditBtn" onclick="cancelEdit()"
+                class="hidden px-5 py-2.5 bg-zinc-700 hover:bg-zinc-600 rounded-lg font-medium transition">
+                Cancel
+              </button>
+            </div>
             <p id="createStatus" class="hidden text-sm text-center mt-1"></p>
           </form>
         </div>
@@ -130,6 +211,26 @@
     function toggleEmbedFields() {
       const enabled = document.getElementById('new_embed_enabled').checked;
       document.getElementById('embedFields').classList.toggle('hidden', !enabled);
+    }
+
+    function addAnnouncementEmbedField(name, value, inline) {
+      const container = document.getElementById('new_embed_fields_container');
+      const row = document.createElement('div');
+      row.className = 'embed-field-row flex gap-2 items-start bg-zinc-800/50 rounded-lg p-2';
+      row.innerHTML =
+        '<div class="flex-1 grid grid-cols-2 gap-2">' +
+        '<input type="text" class="field-name w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm text-white placeholder-zinc-500" placeholder="Field name" value="' + (name || '') + '">' +
+        '<input type="text" class="field-value w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm text-white placeholder-zinc-500" placeholder="Field value" value="' + (value || '') + '">' +
+        '</div>' +
+        '<label class="flex items-center gap-1.5 cursor-pointer flex-shrink-0 pt-1.5">' +
+        '<input type="checkbox" class="field-inline sr-only peer"' + (inline ? ' checked' : '') + '>' +
+        '<div class="w-8 h-4 bg-zinc-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[\'\'] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-indigo-600 relative"></div>' +
+        '<span class="text-xs text-zinc-500">Inline</span>' +
+        '</label>' +
+        '<button type="button" onclick="this.closest(\'.embed-field-row\').remove()" class="p-1 text-zinc-500 hover:text-red-400 transition flex-shrink-0 pt-1.5" title="Remove">' +
+        '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>' +
+        '</button>';
+      container.appendChild(row);
     }
 
     function updateScheduleFields() {
@@ -238,6 +339,9 @@
                 onchange="toggleAnnouncement(${a.id}, this.checked)">
               <div class="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600 relative"></div>
             </label>
+            <!-- Edit -->
+            <button onclick="editAnnouncement(${a.id})"
+              class="text-zinc-500 hover:text-indigo-400 transition text-lg leading-none px-1" title="Edit">📝</button>
             <!-- Delete -->
             <button onclick="deleteAnnouncement(${a.id})"
               class="text-zinc-500 hover:text-red-400 transition text-lg leading-none px-1" title="Delete">🗑️</button>
@@ -252,6 +356,8 @@
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;');
     }
+
+    let editingId = null;
 
     async function toggleAnnouncement(id, enabled) {
       try {
@@ -269,8 +375,114 @@
       if (!confirm('Delete this scheduled announcement? This cannot be undone.')) return;
       try {
         const res = await fetch(`/api/guilds/${guildId}/announcements/${id}`, { method: 'DELETE' });
-        if (res.ok) loadAnnouncements();
+        if (res.ok) {
+          // If we were editing this announcement, cancel edit
+          if (editingId === id) cancelEdit();
+          loadAnnouncements();
+        }
       } catch {}
+    }
+
+    async function editAnnouncement(id) {
+      try {
+        const res = await fetch(`/api/guilds/${guildId}/announcements`);
+        const items = await res.json();
+        const a = items.find(item => item.id === id);
+        if (!a) return;
+
+        editingId = id;
+
+        // Update form title and button
+        document.getElementById('formTitle').textContent = '✏️ Edit Announcement';
+        document.getElementById('submitBtn').textContent = 'Update Announcement';
+        document.getElementById('cancelEditBtn').classList.remove('hidden');
+
+        // Fill basic fields
+        document.getElementById('new_channel_id').value = a.channel_id || '';
+        document.getElementById('new_message').value = a.message || '';
+
+        // Fill embed fields
+        const hasEmbed = !!a.embed_json;
+        document.getElementById('new_embed_enabled').checked = hasEmbed;
+        toggleEmbedFields();
+        if (hasEmbed) {
+          const e = a.embed_json || {};
+          document.getElementById('new_embed_title').value = e.title || '';
+          document.getElementById('new_embed_url').value = e.url || '';
+          document.getElementById('new_embed_description').value = e.description || '';
+          document.getElementById('new_embed_color').value = e.color || '';
+          document.getElementById('new_embed_timestamp').checked = !!e.timestamp;
+          document.getElementById('new_embed_author_name').value = (e.author && e.author.name) || '';
+          document.getElementById('new_embed_author_url').value = (e.author && e.author.url) || '';
+          document.getElementById('new_embed_author_icon').value = (e.author && e.author.icon_url) || '';
+          document.getElementById('new_embed_thumbnail').value = (e.thumbnail && e.thumbnail.url) || '';
+          document.getElementById('new_embed_image').value = (e.image && e.image.url) || (e.image || '');
+          document.getElementById('new_embed_footer_text').value = (e.footer && e.footer.text) || '';
+          document.getElementById('new_embed_footer_icon').value = (e.footer && e.footer.icon_url) || '';
+          // Clear and repopulate fields
+          document.getElementById('new_embed_fields_container').innerHTML = '';
+          (e.fields || []).forEach(f => addAnnouncementEmbedField(f.name, f.value, f.inline));
+        }
+
+        // Set schedule type and trigger dynamic fields
+        document.getElementById('new_schedule_type').value = a.schedule_type || 'once';
+        updateScheduleFields();
+
+        // Fill schedule-specific fields
+        if (a.schedule_type === 'once' && a.run_at) {
+          const dt = new Date(a.run_at);
+          const offset = dt.getTimezoneOffset();
+          const local = new Date(dt.getTime() - offset * 60000);
+          const el = document.getElementById('sched_run_at');
+          if (el) el.value = local.toISOString().slice(0, 16);
+        } else if (a.schedule_type === 'daily' && a.run_at) {
+          const el = document.getElementById('sched_run_at');
+          if (el) el.value = a.run_at;
+        } else if (a.schedule_type === 'weekly') {
+          const dayEl = document.getElementById('sched_day_of_week');
+          if (dayEl && a.day_of_week !== null && a.day_of_week !== undefined) dayEl.value = a.day_of_week;
+          const timeEl = document.getElementById('sched_run_at');
+          if (timeEl && a.run_at) timeEl.value = a.run_at;
+        } else if (a.schedule_type === 'interval') {
+          const el = document.getElementById('sched_interval_minutes');
+          if (el && a.interval_minutes) el.value = a.interval_minutes;
+        }
+
+        // Scroll to form
+        document.getElementById('createForm').scrollIntoView({ behavior: 'smooth' });
+      } catch {
+        // silently fail
+      }
+    }
+
+    function cancelEdit() {
+      editingId = null;
+      document.getElementById('formTitle').textContent = '➕ Create New Announcement';
+      document.getElementById('submitBtn').textContent = 'Create Announcement';
+      document.getElementById('cancelEditBtn').classList.add('hidden');
+      document.getElementById('new_message').value = '';
+      document.getElementById('new_embed_enabled').checked = false;
+      document.getElementById('new_embed_fields_container').innerHTML = '';
+      toggleEmbedFields();
+      clearEmbedFields();
+      document.getElementById('new_schedule_type').value = 'once';
+      updateScheduleFields();
+      document.getElementById('createStatus').classList.add('hidden');
+    }
+
+    function clearEmbedFields() {
+      document.getElementById('new_embed_title').value = '';
+      document.getElementById('new_embed_url').value = '';
+      document.getElementById('new_embed_description').value = '';
+      document.getElementById('new_embed_color').value = '';
+      document.getElementById('new_embed_timestamp').checked = false;
+      document.getElementById('new_embed_author_name').value = '';
+      document.getElementById('new_embed_author_url').value = '';
+      document.getElementById('new_embed_author_icon').value = '';
+      document.getElementById('new_embed_thumbnail').value = '';
+      document.getElementById('new_embed_image').value = '';
+      document.getElementById('new_embed_footer_text').value = '';
+      document.getElementById('new_embed_footer_icon').value = '';
     }
 
     document.getElementById('createForm').addEventListener('submit', async (e) => {
@@ -296,17 +508,48 @@
       if (intervalEl) data.interval_minutes = parseInt(intervalEl.value);
 
       if (document.getElementById('new_embed_enabled').checked) {
-        const embedTitle = document.getElementById('new_embed_title').value.trim();
-        const embedDesc  = document.getElementById('new_embed_description').value.trim();
-        if (embedTitle || embedDesc) {
-          data.embed_json = {};
-          if (embedTitle) data.embed_json.title = embedTitle;
-          if (embedDesc)  data.embed_json.description = embedDesc;
-          const color = document.getElementById('new_embed_color').value.trim();
-          const image = document.getElementById('new_embed_image').value.trim();
-          if (color) data.embed_json.color = color;
-          if (image) data.embed_json.image = image;
-        }
+        const embedJson = {};
+
+        const title = document.getElementById('new_embed_title').value.trim();
+        const url = document.getElementById('new_embed_url').value.trim();
+        const desc = document.getElementById('new_embed_description').value.trim();
+        const color = document.getElementById('new_embed_color').value.trim();
+        const timestamp = document.getElementById('new_embed_timestamp').checked;
+        const authorName = document.getElementById('new_embed_author_name').value.trim();
+        const authorUrl = document.getElementById('new_embed_author_url').value.trim();
+        const authorIcon = document.getElementById('new_embed_author_icon').value.trim();
+        const thumbnail = document.getElementById('new_embed_thumbnail').value.trim();
+        const image = document.getElementById('new_embed_image').value.trim();
+        const footerText = document.getElementById('new_embed_footer_text').value.trim();
+        const footerIcon = document.getElementById('new_embed_footer_icon').value.trim();
+
+        if (title) embedJson.title = title;
+        if (url) embedJson.url = url;
+        if (desc) embedJson.description = desc;
+        if (color) embedJson.color = color;
+        if (timestamp) embedJson.timestamp = true;
+        if (authorName) embedJson.author = { name: authorName, ...(authorUrl && { url: authorUrl }), ...(authorIcon && { icon_url: authorIcon }) };
+        if (thumbnail) embedJson.thumbnail = { url: thumbnail };
+        if (image) embedJson.image = { url: image };
+        if (footerText) embedJson.footer = { text: footerText, ...(footerIcon && { icon_url: footerIcon }) };
+
+        // Collect fields
+        const fieldRows = document.querySelectorAll('#new_embed_fields_container .embed-field-row');
+        const fields = [];
+        fieldRows.forEach(row => {
+          const nameEl = row.querySelector('.field-name');
+          const valueEl = row.querySelector('.field-value');
+          const inlineEl = row.querySelector('.field-inline');
+          const name = nameEl ? nameEl.value.trim() : '';
+          const value = valueEl ? valueEl.value.trim() : '';
+          if (name && value) fields.push({ name, value, inline: inlineEl ? inlineEl.checked : false });
+        });
+        if (fields.length > 0) embedJson.fields = fields;
+
+        if (Object.keys(embedJson).length > 0) data.embed_json = embedJson;
+      } else if (editingId !== null) {
+        // When editing and embed toggle is off, explicitly clear the embed
+        data.embed_json = null;
       }
 
       if (!data.channel_id) {
@@ -322,23 +565,25 @@
         return;
       }
 
+      const isEdit = editingId !== null;
+      const method = isEdit ? 'PATCH' : 'POST';
+      const url = isEdit
+        ? `/api/guilds/${guildId}/announcements/${editingId}`
+        : `/api/guilds/${guildId}/announcements`;
+
       try {
-        const res = await fetch(`/api/guilds/${guildId}/announcements`, {
-          method: 'POST',
+        const res = await fetch(url, {
+          method,
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(data)
         });
         if (!res.ok) throw new Error((await res.json()).error || 'Failed');
 
-        status.textContent = '✓ Announcement scheduled!';
+        status.textContent = isEdit ? '✓ Announcement updated!' : '✓ Announcement scheduled!';
         status.className = 'text-sm text-center mt-1 text-green-400';
         status.classList.remove('hidden');
 
-        document.getElementById('new_message').value = '';
-        document.getElementById('new_embed_enabled').checked = false;
-        toggleEmbedFields();
-        document.getElementById('new_schedule_type').value = 'once';
-        updateScheduleFields();
+        cancelEdit();
         loadAnnouncements();
       } catch (err) {
         status.textContent = `✗ ${err.message}`;

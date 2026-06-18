@@ -36,7 +36,7 @@ module.exports = {
     const isAnonymous = interaction.options.getBoolean('anonymous') || false;
 
     const targetMember = await interaction.guild.members.fetch(user.id).catch(() => null);
-    
+
     const error = runModerationChecks({
       targetUser: user,
       executor: interaction.user,
@@ -45,8 +45,8 @@ module.exports = {
       executorMember: interaction.member,
       action: 'warn'
     });
-    
-    if (error) return replyError(interaction, error);
+
+    if (error) {return replyError(interaction, error);}
 
     try {
       const warningId = db.addWarning(

@@ -154,14 +154,36 @@
     let allCommands = {};
     let disabledCommands = [];
     
-    // Categories that contain public commands (exclude moderation)
-    const publicCategories = ['fun', 'utility', 'features'];
+    const preferredCategoryOrder = ['fun', 'utility', 'features'];
     
     const categoryInfo = {
       fun: { icon: '🎮', name: 'Fun', description: 'Entertainment and interactive commands' },
       utility: { icon: '🔧', name: 'Utility', description: 'Helpful utility commands' },
       features: { icon: '✨', name: 'Features', description: 'Server feature commands' }
     };
+
+    function getDisplayCategories() {
+      const categories = Object.keys(allCommands || {})
+        .filter(category => category !== 'moderation' && Array.isArray(allCommands[category]) && allCommands[category].length > 0);
+
+      return categories.sort((a, b) => {
+        const aIndex = preferredCategoryOrder.indexOf(a);
+        const bIndex = preferredCategoryOrder.indexOf(b);
+
+        if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
+        if (aIndex !== -1) return -1;
+        if (bIndex !== -1) return 1;
+        return a.localeCompare(b);
+      });
+    }
+
+    function getCategoryDisplayInfo(category) {
+      return categoryInfo[category] || {
+        icon: '🧩',
+        name: category.charAt(0).toUpperCase() + category.slice(1),
+        description: 'Guild-specific custom commands'
+      };
+    }
 
     function onGuildReady(data) {
       document.title = `Command Toggles - ${data.name} - ShaggyBot`;
@@ -170,7 +192,7 @@
 
     async function loadCommands() {
       try {
-        const res = await fetch('/api/commands');
+        const res = await fetch(`/api/guilds/${guildId}/commands`);
         allCommands = await res.json();
         await loadSettings();
       } catch (err) {
@@ -204,12 +226,13 @@
       
       let totalCommands = 0;
       let enabledCount = 0;
+      const categories = getDisplayCategories();
 
-      publicCategories.forEach(category => {
+      categories.forEach(category => {
         const commands = allCommands[category];
         if (!commands || commands.length === 0) return;
 
-        const info = categoryInfo[category];
+        const info = getCategoryDisplayInfo(category);
         const section = document.createElement('div');
         section.className = 'bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden';
         
@@ -302,17 +325,17 @@
     }
 
     function enableAllCommands() {
-      publicCategories.forEach(cat => toggleCategoryCommands(cat, true));
+      getDisplayCategories().forEach(cat => toggleCategoryCommands(cat, true));
     }
 
     function disableAllCommands() {
-      publicCategories.forEach(cat => toggleCategoryCommands(cat, false));
+      getDisplayCategories().forEach(cat => toggleCategoryCommands(cat, false));
     }
 
     function updateCommandCount() {
       let total = 0;
       let enabled = 0;
-      publicCategories.forEach(cat => {
+      getDisplayCategories().forEach(cat => {
         const commands = allCommands[cat] || [];
         total += commands.length;
         commands.forEach(cmd => {

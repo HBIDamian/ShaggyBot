@@ -41,10 +41,10 @@ function checkBotTarget(targetUser, client, action) {
  * @returns {string|null} Error message or null
  */
 function checkHierarchy(targetMember, executorMember, action) {
-  if (!targetMember) return null;
-  
+  if (!targetMember) {return null;}
+
   const guild = executorMember.guild;
-  
+
   if (targetMember.roles.highest.position >= executorMember.roles.highest.position &&
       guild.ownerId !== executorMember.id) {
     return `❌ You cannot ${action} someone with a higher or equal role.`;
@@ -59,17 +59,17 @@ function checkHierarchy(targetMember, executorMember, action) {
  * @returns {string|null} Error message or null
  */
 function checkBotPermission(targetMember, action) {
-  if (!targetMember) return null;
-  
+  if (!targetMember) {return null;}
+
   const checks = {
     kick: () => !targetMember.kickable,
     ban: () => !targetMember.bannable,
     moderate: () => !targetMember.moderatable,
     timeout: () => !targetMember.moderatable
   };
-  
+
   const check = checks[action] || checks.moderate;
-  
+
   if (check()) {
     return `❌ I cannot ${action} this user. They may have a higher role than me or be the server owner.`;
   }
@@ -90,12 +90,12 @@ function checkBotPermission(targetMember, action) {
  * @param {boolean} options.requireKickable - Check kickable permission
  * @returns {string|null} First error message or null if all pass
  */
-function runModerationChecks({ 
-  targetUser, 
-  executor, 
-  client, 
-  targetMember, 
-  executorMember, 
+function runModerationChecks({
+  targetUser,
+  executor,
+  client,
+  targetMember,
+  executorMember,
   action,
   requireInGuild = false,
   requireBannable = false,
@@ -103,32 +103,32 @@ function runModerationChecks({
 }) {
   // Check self-target
   const selfError = checkSelfTarget(targetUser, executor, action);
-  if (selfError) return selfError;
-  
+  if (selfError) {return selfError;}
+
   // Check bot target
   const botError = checkBotTarget(targetUser, client, action);
-  if (botError) return botError;
-  
+  if (botError) {return botError;}
+
   // Check if target must be in guild
   if (requireInGuild && !targetMember) {
     return '❌ This user is not in the server.';
   }
-  
+
   // Check bot can perform action
   if (targetMember) {
     // Determine which permission check to use
     let permAction = action;
-    if (requireBannable) permAction = 'ban';
-    else if (requireKickable) permAction = 'kick';
-    
+    if (requireBannable) {permAction = 'ban';}
+    else if (requireKickable) {permAction = 'kick';}
+
     const botPermError = checkBotPermission(targetMember, permAction);
-    if (botPermError) return botPermError;
-    
+    if (botPermError) {return botPermError;}
+
     // Check hierarchy
     const hierarchyError = checkHierarchy(targetMember, executorMember, action);
-    if (hierarchyError) return hierarchyError;
+    if (hierarchyError) {return hierarchyError;}
   }
-  
+
   return null;
 }
 
@@ -139,11 +139,11 @@ function runModerationChecks({
  */
 function parseTime(timeStr) {
   const match = timeStr.match(/^(\d+)([smhdw])$/i);
-  if (!match) return null;
-  
+  if (!match) {return null;}
+
   const value = parseInt(match[1]);
   const unit = match[2].toLowerCase();
-  
+
   const multipliers = {
     s: 1000,
     m: 60 * 1000,
@@ -151,7 +151,7 @@ function parseTime(timeStr) {
     d: 24 * 60 * 60 * 1000,
     w: 7 * 24 * 60 * 60 * 1000
   };
-  
+
   return value * multipliers[unit];
 }
 
@@ -165,10 +165,10 @@ function formatDuration(ms) {
   const minutes = Math.floor(seconds / 60);
   const hours = Math.floor(minutes / 60);
   const days = Math.floor(hours / 24);
-  
-  if (days > 0) return `${days} day${days !== 1 ? 's' : ''}`;
-  if (hours > 0) return `${hours} hour${hours !== 1 ? 's' : ''}`;
-  if (minutes > 0) return `${minutes} minute${minutes !== 1 ? 's' : ''}`;
+
+  if (days > 0) {return `${days} day${days !== 1 ? 's' : ''}`;}
+  if (hours > 0) {return `${hours} hour${hours !== 1 ? 's' : ''}`;}
+  if (minutes > 0) {return `${minutes} minute${minutes !== 1 ? 's' : ''}`;}
   return `${seconds} second${seconds !== 1 ? 's' : ''}`;
 }
 

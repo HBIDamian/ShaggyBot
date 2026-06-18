@@ -33,7 +33,8 @@ const GUILD_PAGES = [
   { path: '/lockdown', view: 'lockdown', title: 'Lockdown', section: 'lockdown' },
   { path: '/honeypot', view: 'honeypot', title: 'Honeypot', section: 'honeypot' },
   { path: '/announcements', view: 'announcements', title: 'Scheduled Announcements', section: 'announcements' },
-  { path: '/backup', view: 'backup', title: 'Server Backup & Restore', section: 'backup' }
+  { path: '/backup', view: 'backup', title: 'Server Backup & Restore', section: 'backup' },
+  { path: '/customcommands', view: 'customcommands', title: 'Custom Commands', section: 'customcommands' }
 ];
 
 /**
@@ -57,11 +58,26 @@ router.get('/dashboard', requireAuth, (req, res) => {
   res.render('dashboard', { activePage: 'dashboard', requiresAuth: true });
 });
 
-// Register all guild page routes dynamically
-GUILD_PAGES.forEach(({ path, view, title, section }) => {
+// Register all guild page routes dynamically (except customcommands which has its own check)
+const STANDARD_PAGES = GUILD_PAGES.filter(p => p.section !== 'customcommands');
+STANDARD_PAGES.forEach(({ path, view, title, section }) => {
   router.get(`/dashboard/:guildId${path}`, requireAuth, (req, res) => {
     res.render(view, { title, activeSection: section, ...GUILD_PAGE_DEFAULTS });
   });
+});
+
+// Custom commands page — requires env-configured access
+router.get('/dashboard/:guildId/customcommands', requireAuth, (req, res) => {
+  const { guildId } = req.params;
+  const client = req.app.get('client');
+  const config = client.customCommandsConfig;
+
+  // If custom commands are disabled for this guild, show an error page
+  if (!config || !config.isAllowed(guildId)) {
+    return res.redirect(`/error?code=403&message=${encodeURIComponent('Custom commands are not enabled for this server.')}`);
+  }
+
+  res.render('customcommands', { title: 'Custom Commands', activeSection: 'customcommands', ...GUILD_PAGE_DEFAULTS });
 });
 
 /**
@@ -81,7 +97,7 @@ router.get('/error', (req, res) => {
  * 404 handler
  */
 router.use((req, res) => {
-  res.status(404).render('error', { 
+  res.status(404).render('error', {
     title: '404 - Page Not Found',
     statusCode: 404,
     message: "The page you're looking for doesn't exist."

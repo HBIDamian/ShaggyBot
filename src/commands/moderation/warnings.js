@@ -19,30 +19,30 @@ async function buildWarningsEmbed(warnings, user, page, client) {
 
   const embed = new EmbedBuilder()
     .setColor(0x5865F2)
-    .setAuthor({ 
-      name: user.username, 
-      iconURL: user.displayAvatarURL({ dynamic: true }) 
+    .setAuthor({
+      name: user.username,
+      iconURL: user.displayAvatarURL({ dynamic: true })
     })
     .setTitle(`Moderation | Warnings | Total: ${warnings.length}`)
     .setFooter({ text: `Page ${page} of ${totalPages}` });
 
   let description = '';
-  
+
   for (const warning of pageWarnings) {
-    const moderator = warning.moderator_id 
+    const moderator = warning.moderator_id
       ? await client.users.fetch(warning.moderator_id).catch(() => null)
       : null;
-    
+
     const modName = moderator ? moderator.username : 'Anonymous';
     const timestamp = getDiscordTimestamp(warning.created_at);
     const reason = warning.reason || 'No reason provided';
-    
+
     // All warnings are "active" in our system (no expiry)
     description += `🟢 **ID:** ${warning.id} - **Moderator:** ${modName} - **Time:** <t:${timestamp}:f> - **Reason:** ${reason}\n\n`;
   }
 
   embed.setDescription(description || 'No warnings found.');
-  
+
   return { embed, totalPages };
 }
 
@@ -75,7 +75,7 @@ function buildPaginationButtons(userId, currentPage, totalPages, disabled = fals
         .setStyle(ButtonStyle.Primary)
         .setDisabled(disabled || currentPage === totalPages)
     );
-  
+
   return row;
 }
 

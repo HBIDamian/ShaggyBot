@@ -199,22 +199,22 @@ module.exports = {
         case 'between': {
           const firstId = interaction.options.getString('first-message-id');
           const secondId = interaction.options.getString('second-message-id');
-          
+
           // Determine which ID is older (smaller snowflake = older)
           const startId = BigInt(firstId) < BigInt(secondId) ? firstId : secondId;
           const endId = BigInt(firstId) < BigInt(secondId) ? secondId : firstId;
-          
+
           // Fetch messages after the start ID
           const messages = await interaction.channel.messages.fetch({ after: startId, limit: 100 });
-          
+
           // Filter to only include messages up to and including the end ID, plus the start message
           messagesToProcess = messages.filter(m => BigInt(m.id) <= BigInt(endId));
-          
+
           // Try to include the start message
           try {
             const startMessage = await interaction.channel.messages.fetch(startId);
             messagesToProcess.set(startMessage.id, startMessage);
-          } catch (e) {
+          } catch (_e) {
             // Start message may have been deleted
           }
           break;
@@ -245,7 +245,7 @@ module.exports = {
           const amount = interaction.options.getInteger('amount');
           const messages = await interaction.channel.messages.fetch({ limit: amount });
           const imageExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp'];
-          messagesToProcess = messages.filter(m => 
+          messagesToProcess = messages.filter(m =>
             m.attachments.some(a => imageExtensions.some(ext => a.name?.toLowerCase().endsWith(ext))) ||
             m.embeds.some(e => e.image || e.thumbnail)
           );
@@ -271,9 +271,9 @@ module.exports = {
         case 'mentions': {
           const amount = interaction.options.getInteger('amount');
           const messages = await interaction.channel.messages.fetch({ limit: amount });
-          messagesToProcess = messages.filter(m => 
-            m.mentions.users.size > 0 || 
-            m.mentions.roles.size > 0 || 
+          messagesToProcess = messages.filter(m =>
+            m.mentions.users.size > 0 ||
+            m.mentions.roles.size > 0 ||
             m.mentions.everyone
           );
           break;
@@ -288,7 +288,7 @@ module.exports = {
 
         case 'until': {
           const messageId = interaction.options.getString('message-id');
-          
+
           // Fetch messages after the given ID
           messagesToProcess = await interaction.channel.messages.fetch({ after: messageId, limit: 100 });
           break;
@@ -318,8 +318,8 @@ module.exports = {
             deleted++;
           }
         }
-        return interaction.editReply({ 
-          content: `✅ Removed reactions from **${deleted}** message${deleted !== 1 ? 's' : ''}.` 
+        return interaction.editReply({
+          content: `✅ Removed reactions from **${deleted}** message${deleted !== 1 ? 's' : ''}.`
         });
       } else {
         // Filter out messages older than 14 days (Discord limitation)
@@ -328,8 +328,8 @@ module.exports = {
         const oldMessages = messagesArray.length - deletableMessages.length;
 
         if (deletableMessages.length === 0) {
-          return interaction.editReply({ 
-            content: '❌ All messages are older than 14 days and cannot be bulk deleted.' 
+          return interaction.editReply({
+            content: '❌ All messages are older than 14 days and cannot be bulk deleted.'
           });
         }
 
@@ -353,11 +353,11 @@ module.exports = {
 
     } catch (error) {
       console.error('Purge error:', error);
-      
+
       if (error.code === 10008) {
         return interaction.editReply({ content: '❌ One or more message IDs were invalid.' });
       }
-      
+
       return interaction.editReply({ content: `❌ An error occurred: ${error.message}` });
     }
   },

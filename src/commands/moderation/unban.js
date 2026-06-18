@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, MessageFlags } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
 const { createLogger } = require('../../utils/logger');
 const { sendPunishmentNotification } = require('../../utils/punishmentNotifier');
 const { markBotAction } = require('../../events/nativeModeration');

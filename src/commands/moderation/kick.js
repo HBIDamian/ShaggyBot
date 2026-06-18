@@ -25,14 +25,14 @@ module.exports = {
         .setDescription('Don\'t announce the kick in the channel')
         .setRequired(false))
     .setDefaultMemberPermissions(PermissionFlagsBits.KickMembers),
-  
+
   async execute(interaction) {
     const user = interaction.options.getUser('user');
     const reason = interaction.options.getString('reason') || 'No reason provided';
     const isSilent = interaction.options.getBoolean('silent') || false;
-    
+
     const targetMember = await interaction.guild.members.fetch(user.id).catch(() => null);
-    
+
     // Run all validation checks
     const error = runModerationChecks({
       targetUser: user,
@@ -43,12 +43,12 @@ module.exports = {
       action: 'kick',
       requireInGuild: true
     });
-    
-    if (error) return replyError(interaction, error);
-    
+
+    if (error) {return replyError(interaction, error);}
+
     try {
       markBotAction(interaction.guildId, user.id, 'kick');
-      
+
       await sendPunishmentNotification({
         guild: interaction.guild,
         user,

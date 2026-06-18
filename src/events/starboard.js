@@ -1,10 +1,10 @@
 const { Events, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const { 
-    getStarboardSettings, 
-    addStarboardMessage, 
-    getStarboardMessage, 
-    updateStarboardMessage, 
-    removeStarboardMessage 
+const {
+    getStarboardSettings,
+    addStarboardMessage,
+    getStarboardMessage,
+    updateStarboardMessage,
+    removeStarboardMessage
 } = require('../database/database');
 const logger = require('../utils/logger');
 
@@ -23,10 +23,10 @@ module.exports = [
     },
 ];
 
-async function handleReaction(reaction, user, action) {
+async function handleReaction(reaction, _user, _action) {
     try {
         // Ignore DMs
-        if (!reaction.message.guild) return;
+        if (!reaction.message.guild) {return;}
 
         // Fetch partial messages/reactions if needed
         if (reaction.partial) {
@@ -37,7 +37,7 @@ async function handleReaction(reaction, user, action) {
                 return;
             }
         }
-        
+
         if (reaction.message.partial) {
             try {
                 await reaction.message.fetch();
@@ -51,34 +51,34 @@ async function handleReaction(reaction, user, action) {
         const settings = getStarboardSettings(guildId);
 
         // Check if starboard is enabled
-        if (!settings || !settings.enabled) return;
-        
+        if (!settings || !settings.enabled) {return;}
+
         // Check if starboard channel is set
-        if (!settings.channel_id) return;
+        if (!settings.channel_id) {return;}
 
         // Get the emoji to check
         const starEmoji = settings.emoji || '⭐';
         const reactionEmoji = reaction.emoji.id ? reaction.emoji.id : reaction.emoji.name;
-        
+
         // Check if this is the correct emoji
         if (reactionEmoji !== starEmoji && reaction.emoji.toString() !== starEmoji) {
             return;
         }
 
         const message = reaction.message;
-        
+
         // Don't star messages from the starboard channel itself
-        if (message.channel.id === settings.channel_id) return;
+        if (message.channel.id === settings.channel_id) {return;}
 
         // Check if channel is ignored
         const ignoredChannels = settings.ignored_channels || [];
-        if (ignoredChannels.includes(message.channel.id)) return;
+        if (ignoredChannels.includes(message.channel.id)) {return;}
 
         // Check NSFW setting
-        if (settings.ignore_nsfw && message.channel.nsfw) return;
+        if (settings.ignore_nsfw && message.channel.nsfw) {return;}
 
         // Count valid stars
-        let starCount = await countValidStars(reaction, message, settings);
+        const starCount = await countValidStars(reaction, message, settings);
 
         const threshold = settings.threshold || 3;
         const existingEntry = getStarboardMessage(guildId, message.id);
@@ -125,7 +125,7 @@ async function countValidStars(reaction, message, settings) {
 
     // Don't count bot reactions
     users.forEach(u => {
-        if (u.bot) count--;
+        if (u.bot) {count--;}
     });
 
     return Math.max(0, count);
@@ -134,7 +134,7 @@ async function countValidStars(reaction, message, settings) {
 async function createStarboardEntry(message, starCount, settings) {
     const guild = message.guild;
     const starboardChannel = guild.channels.cache.get(settings.channel_id);
-    
+
     if (!starboardChannel) {
         logger.warn(`Starboard channel ${settings.channel_id} not found in guild ${guild.id}`);
         return;
@@ -156,8 +156,8 @@ async function createStarboardEntry(message, starCount, settings) {
         });
 
         // Save to database
-        addStarboardMessage(guild.id, message.id, starboardMessage.id, starCount);
-        
+        addStarboardMessage({ guildId: guild.id, originalMessageId: message.id, originalChannelId: message.channel.id, authorId: message.author.id, starboardMessageId: starboardMessage.id, starCount });
+
         logger.info(`Added message ${message.id} to starboard in guild ${guild.name}`);
     } catch (error) {
         logger.error('Failed to create starboard entry:', error);
@@ -167,12 +167,12 @@ async function createStarboardEntry(message, starCount, settings) {
 async function updateStarboardEntry(message, existingEntry, starCount, settings) {
     const guild = message.guild;
     const starboardChannel = guild.channels.cache.get(settings.channel_id);
-    
-    if (!starboardChannel) return;
+
+    if (!starboardChannel) {return;}
 
     try {
         const starboardMessage = await starboardChannel.messages.fetch(existingEntry.starboard_message_id);
-        
+
         const embed = buildStarboardEmbed(message, starCount, settings);
         const jumpButton = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
@@ -203,8 +203,8 @@ async function updateStarboardEntry(message, existingEntry, starCount, settings)
 async function deleteStarboardEntry(message, existingEntry, settings) {
     const guild = message.guild;
     const starboardChannel = guild.channels.cache.get(settings.channel_id);
-    
-    if (!starboardChannel) return;
+
+    if (!starboardChannel) {return;}
 
     try {
         const starboardMessage = await starboardChannel.messages.fetch(existingEntry.starboard_message_id);
@@ -221,7 +221,7 @@ async function deleteStarboardEntry(message, existingEntry, settings) {
     logger.info(`Removed message ${message.id} from starboard in guild ${guild.name}`);
 }
 
-function buildStarboardEmbed(message, starCount, settings) {
+function buildStarboardEmbed(message, starCount, _settings) {
     const embed = new EmbedBuilder()
         .setColor(getStarColor(starCount))
         .setAuthor({
@@ -271,9 +271,9 @@ function buildStarboardEmbed(message, starCount, settings) {
 
 function getStarColor(starCount) {
     // Color gradient based on star count
-    if (starCount >= 20) return 0xFFD700; // Gold
-    if (starCount >= 15) return 0xFFE135; // Banana yellow
-    if (starCount >= 10) return 0xFFE680; // Light gold
-    if (starCount >= 5) return 0xFFEC8B;  // Light goldenrod
+    if (starCount >= 20) {return 0xFFD700;} // Gold
+    if (starCount >= 15) {return 0xFFE135;} // Banana yellow
+    if (starCount >= 10) {return 0xFFE680;} // Light gold
+    if (starCount >= 5) {return 0xFFEC8B;}  // Light goldenrod
     return 0xFFFF9F; // Light yellow
 }

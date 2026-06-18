@@ -18,39 +18,28 @@ const db = new Database(dbPath);
 db.exec('PRAGMA foreign_keys = ON');
 db.exec('PRAGMA journal_mode = WAL');
 
-// Prepared statement cache
-const stmtCache = new Map();
-
-/**
- * Get or create a cached prepared statement
- * @param {string} sql - SQL query
- * @returns {Statement} Prepared statement
- */
-function stmt(sql) {
-  if (!stmtCache.has(sql)) {
-    stmtCache.set(sql, db.prepare(sql));
-  }
-  return stmtCache.get(sql);
-}
+// Prepared statement cache (reserved for future use)
+const _stmtCache = new Map();
 
 /**
  * Helper to build and execute UPDATE queries
- * @param {string} table - Table name
- * @param {string} whereColumn - Column for WHERE clause
- * @param {*} whereValue - Value for WHERE clause
- * @param {Object} updates - Object with fields to update
- * @param {string[]} allowedFields - List of allowed field names
- * @param {string[]} jsonFields - List of fields to JSON stringify
+ * @param {Object} opts
+ * @param {string} opts.table - Table name
+ * @param {string} opts.whereColumn - Column for WHERE clause
+ * @param {*} opts.whereValue - Value for WHERE clause
+ * @param {Object} opts.updates - Object with fields to update
+ * @param {string[]} opts.allowedFields - List of allowed field names
+ * @param {string[]} [opts.jsonFields=[]] - List of fields to JSON stringify
  * @returns {Object} Result with success and skippedFields
  */
-function updateTable(table, whereColumn, whereValue, updates, allowedFields, jsonFields = []) {
+function updateTable({ table, whereColumn, whereValue, updates, allowedFields, jsonFields = [] }) {
   const unknownFields = Object.keys(updates).filter(key => !allowedFields.includes(key));
   const fields = Object.keys(updates).filter(key => allowedFields.includes(key));
-  
+
   if (fields.length === 0) {
     return { success: false, skippedFields: unknownFields };
   }
-  
+
   // Process JSON fields
   const processedUpdates = { ...updates };
   jsonFields.forEach(field => {
@@ -58,12 +47,12 @@ function updateTable(table, whereColumn, whereValue, updates, allowedFields, jso
       processedUpdates[field] = JSON.stringify(processedUpdates[field]);
     }
   });
-  
+
   const setClause = fields.map(f => `${f} = ?`).join(', ');
   const values = [...fields.map(f => processedUpdates[f]), whereValue];
-  
+
   db.prepare(`UPDATE ${table} SET ${setClause} WHERE ${whereColumn} = ?`).run(...values);
-  
+
   return { success: true, skippedFields: unknownFields };
 }
 
@@ -229,7 +218,7 @@ function initDatabase() {
   try {
     const columns = db.prepare("PRAGMA table_info(moderation_settings)").all();
     const columnNames = columns.map(c => c.name);
-    
+
     if (!columnNames.includes('punishment_notify_mode')) {
       db.exec("ALTER TABLE moderation_settings ADD COLUMN punishment_notify_mode TEXT DEFAULT 'dm_only'");
     }
@@ -253,7 +242,7 @@ function initDatabase() {
     if (!columnNames.includes('lockdown_message')) {
       db.exec("ALTER TABLE moderation_settings ADD COLUMN lockdown_message TEXT");
     }
-  } catch (e) {
+  } catch (_e) {
     // Columns already exist or other non-critical error
   }
 
@@ -261,11 +250,11 @@ function initDatabase() {
   try {
     const automodColumns = db.prepare("PRAGMA table_info(automod_settings)").all();
     const automodColumnNames = automodColumns.map(c => c.name);
-    
+
     if (!automodColumnNames.includes('file_extensions_whitelist_mode')) {
       db.exec("ALTER TABLE automod_settings ADD COLUMN file_extensions_whitelist_mode INTEGER DEFAULT 0");
     }
-  } catch (e) {
+  } catch (_e) {
     // Columns already exist or other non-critical error
   }
 
@@ -429,7 +418,7 @@ function initDatabase() {
   try {
     const antiRaidColumns = db.prepare("PRAGMA table_info(anti_raid_settings)").all();
     const antiRaidColumnNames = antiRaidColumns.map(c => c.name);
-    
+
     // All columns that should exist in the table
     const requiredColumns = [
       { name: 'enabled', type: 'INTEGER DEFAULT 0' },
@@ -458,13 +447,13 @@ function initDatabase() {
       { name: 'message_spam_ignored_roles', type: "TEXT DEFAULT '[]'" },
       { name: 'message_spam_ignored_channels', type: "TEXT DEFAULT '[]'" }
     ];
-    
+
     for (const col of requiredColumns) {
       if (!antiRaidColumnNames.includes(col.name)) {
         db.exec(`ALTER TABLE anti_raid_settings ADD COLUMN ${col.name} ${col.type}`);
       }
     }
-  } catch (e) {
+  } catch (_e) {
     // Columns already exist or other non-critical error
   }
 
@@ -667,7 +656,7 @@ function initDatabase() {
         db.exec(`ALTER TABLE troll_discourager_settings ADD COLUMN ${col} INTEGER DEFAULT ${defaultVal}`);
       }
     }
-  } catch (e) { /* Table doesn't exist yet, will be created */ }
+  } catch (_e) { /* Table doesn't exist yet, will be created */ }
 
   // Reminders table
   db.exec(`
@@ -713,7 +702,7 @@ function initDatabase() {
         db.exec(`ALTER TABLE honeypot_settings ADD COLUMN ${col.name} ${col.type}`);
       }
     }
-  } catch (e) {
+  } catch (_e) {
     // Columns already exist or other non-critical error
   }
 
@@ -740,6 +729,32 @@ function initDatabase() {
       FOREIGN KEY (guild_id) REFERENCES guild_settings(guild_id) ON DELETE CASCADE
     )
   `);
+
+  // Dynamic custom guild commands (dashboard-managed)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS custom_guild_commands (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      guild_id TEXT NOT NULL,
+      command_name TEXT NOT NULL,
+      command_description TEXT DEFAULT '',
+      category TEXT DEFAULT 'custom',
+      subcommands TEXT DEFAULT '[]',
+      default_permissions TEXT DEFAULT NULL,
+      enabled INTEGER DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(guild_id, command_name),
+      FOREIGN KEY (guild_id) REFERENCES guild_settings(guild_id) ON DELETE CASCADE
+    )
+  `);
+
+  // Migration: add default_permissions column to existing custom_guild_commands table
+  try {
+    const cols = db.prepare("PRAGMA table_info(custom_guild_commands)").all().map(c => c.name);
+    if (!cols.includes('default_permissions')) {
+      db.exec("ALTER TABLE custom_guild_commands ADD COLUMN default_permissions TEXT DEFAULT NULL");
+    }
+  } catch { /* column may already exist */ }
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS scheduled_announcements (
@@ -792,17 +807,17 @@ function initDatabase() {
  */
 function getGuildSettings(guildId, guildName = null) {
   let settings = db.prepare('SELECT * FROM guild_settings WHERE guild_id = ?').get(guildId);
-  
+
   if (!settings) {
     db.prepare(`
       INSERT INTO guild_settings (guild_id, guild_name) VALUES (?, ?)
     `).run(guildId, guildName);
-    
+
     // Also create automod settings
     db.prepare(`
       INSERT INTO automod_settings (guild_id) VALUES (?)
     `).run(guildId);
-    
+
     settings = db.prepare('SELECT * FROM guild_settings WHERE guild_id = ?').get(guildId);
   } else if (guildName && settings.guild_name !== guildName) {
     // Update guild name if changed
@@ -810,7 +825,7 @@ function getGuildSettings(guildId, guildName = null) {
       .run(guildName, guildId);
     settings.guild_name = guildName;
   }
-  
+
   return settings;
 }
 
@@ -823,16 +838,16 @@ function getGuildSettings(guildId, guildName = null) {
 function updateGuildSettings(guildId, updates) {
   const allowedFields = ['prefix', 'mod_log_channel', 'welcome_channel', 'welcome_message', 'leave_message', 'auto_role', 'suggestion_channel', 'suggestion_approved_channel', 'suggestion_denied_channel', 'server_timezone', 'notes_staff_role', 'auto_quoter_enabled', 'git_previewer_enabled', 'tags_manage_own', 'tags_manage_all'];
   const fields = Object.keys(updates).filter(key => allowedFields.includes(key));
-  
-  if (fields.length === 0) return false;
-  
+
+  if (fields.length === 0) {return false;}
+
   const setClause = fields.map(field => `${field} = ?`).join(', ');
   const values = fields.map(field => updates[field]);
-  
+
   db.prepare(`
     UPDATE guild_settings SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE guild_id = ?
   `).run(...values, guildId);
-  
+
   return true;
 }
 
@@ -844,21 +859,21 @@ function updateGuildSettings(guildId, updates) {
 function getAutomodSettings(guildId) {
   // Ensure guild settings exist first
   getGuildSettings(guildId);
-  
+
   let settings = db.prepare('SELECT * FROM automod_settings WHERE guild_id = ?').get(guildId);
-  
+
   if (!settings) {
     db.prepare('INSERT INTO automod_settings (guild_id) VALUES (?)').run(guildId);
     settings = db.prepare('SELECT * FROM automod_settings WHERE guild_id = ?').get(guildId);
   }
-  
+
   // Parse JSON fields
   settings.bad_words_list = JSON.parse(settings.bad_words_list || '[]');
   settings.links_whitelist = JSON.parse(settings.links_whitelist || '[]');
   settings.file_extensions_list = JSON.parse(settings.file_extensions_list || '[]');
   settings.exempt_roles = JSON.parse(settings.exempt_roles || '[]');
   settings.exempt_channels = JSON.parse(settings.exempt_channels || '[]');
-  
+
   return settings;
 }
 
@@ -891,17 +906,17 @@ function updateAutomodSettings(guildId, updates) {
     'dehoist_enabled',
     'spam_enabled', 'spam_threshold', 'spam_interval', 'spam_action'
   ];
-  
+
   // Check for unknown fields and warn about them
   const unknownFields = Object.keys(updates).filter(key => !allowedFields.includes(key));
   if (unknownFields.length > 0) {
     console.warn(`[Database] Warning: Unknown automod fields will be skipped: ${unknownFields.join(', ')}`);
   }
-  
+
   const fields = Object.keys(updates).filter(key => allowedFields.includes(key));
-  
-  if (fields.length === 0) return { success: false, skippedFields: unknownFields };
-  
+
+  if (fields.length === 0) {return { success: false, skippedFields: unknownFields };}
+
   // Stringify JSON fields
   const jsonFields = ['bad_words_list', 'links_whitelist', 'file_extensions_list', 'exempt_roles', 'exempt_channels'];
   const processedUpdates = { ...updates };
@@ -910,14 +925,14 @@ function updateAutomodSettings(guildId, updates) {
       processedUpdates[field] = JSON.stringify(processedUpdates[field]);
     }
   });
-  
+
   const setClause = fields.map(field => `${field} = ?`).join(', ');
   const values = fields.map(field => processedUpdates[field]);
-  
+
   db.prepare(`
     UPDATE automod_settings SET ${setClause} WHERE guild_id = ?
   `).run(...values, guildId);
-  
+
   return { success: true, skippedFields: unknownFields };
 }
 
@@ -934,7 +949,7 @@ function logModAction(guildId, userId, moderatorId, action, reason) {
   const result = db.prepare(`
     INSERT INTO mod_actions (guild_id, user_id, moderator_id, action, reason) VALUES (?, ?, ?, ?, ?)
   `).run(guildId, userId, moderatorId, action, reason);
-  
+
   return result.lastInsertRowid;
 }
 
@@ -995,7 +1010,7 @@ function setModLogRetentionDays(guildId, days) {
  */
 function cleanupOldModActions(guildId = null) {
   let totalDeleted = 0;
-  
+
   if (guildId) {
     // Clean specific guild
     const retentionDays = getModLogRetentionDays(guildId);
@@ -1018,11 +1033,11 @@ function cleanupOldModActions(guildId = null) {
       totalDeleted += result.changes;
     }
   }
-  
+
   if (totalDeleted > 0) {
     logger.info(`Cleaned up ${totalDeleted} old mod action logs`);
   }
-  
+
   return totalDeleted;
 }
 
@@ -1060,12 +1075,12 @@ function setWarningRetentionDays(guildId, days) {
  */
 function cleanupOldWarnings(guildId = null) {
   let totalDeleted = 0;
-  
+
   if (guildId) {
     // Clean specific guild
     const retentionDays = getWarningRetentionDays(guildId);
     // 0 means keep forever
-    if (retentionDays === 0) return 0;
+    if (retentionDays === 0) {return 0;}
     const result = db.prepare(`
       DELETE FROM warnings 
       WHERE guild_id = ? 
@@ -1078,7 +1093,7 @@ function cleanupOldWarnings(guildId = null) {
     for (const guild of guilds) {
       const retentionDays = guild.warning_retention_days ?? 365;
       // 0 means keep forever
-      if (retentionDays === 0) continue;
+      if (retentionDays === 0) {continue;}
       const result = db.prepare(`
         DELETE FROM warnings 
         WHERE guild_id = ? 
@@ -1087,11 +1102,11 @@ function cleanupOldWarnings(guildId = null) {
       totalDeleted += result.changes;
     }
   }
-  
+
   if (totalDeleted > 0) {
     logger.info(`Cleaned up ${totalDeleted} old warnings`);
   }
-  
+
   return totalDeleted;
 }
 
@@ -1107,7 +1122,7 @@ function addWarning(guildId, userId, moderatorId, reason) {
   const result = db.prepare(`
     INSERT INTO warnings (guild_id, user_id, moderator_id, reason) VALUES (?, ?, ?, ?)
   `).run(guildId, userId, moderatorId, reason);
-  
+
   return result.lastInsertRowid;
 }
 
@@ -1181,13 +1196,13 @@ function getAllWarnings(guildId) {
  * @returns {number} Number inserted
  */
 function bulkInsertWarnings(guildId, warnings) {
-  if (!Array.isArray(warnings) || warnings.length === 0) return 0;
+  if (!Array.isArray(warnings) || warnings.length === 0) {return 0;}
   const insert = db.prepare(
     'INSERT INTO warnings (guild_id, user_id, moderator_id, reason, created_at) VALUES (?, ?, ?, ?, ?)'
   );
   const insertMany = db.transaction((items) => {
     for (const w of items) {
-      if (!w.user_id || !w.moderator_id) continue;
+      if (!w.user_id || !w.moderator_id) {continue;}
       insert.run(guildId, w.user_id, w.moderator_id, w.reason || null, w.created_at || new Date().toISOString());
     }
   });
@@ -1248,7 +1263,7 @@ function getExpiredTempbans() {
  * @param {string} messageContent - The message content
  * @returns {number} The report ID
  */
-function createMessageReport(guildId, messageId, reportedUserId, reporterId, channelId, messageContent) {
+function createMessageReport({ guildId, messageId, reportedUserId, reporterId, channelId, messageContent }) {
   const result = db.prepare(`
     INSERT INTO message_reports (guild_id, message_id, reported_user_id, reporter_id, channel_id, message_content)
     VALUES (?, ?, ?, ?, ?, ?)
@@ -1287,13 +1302,13 @@ function getMessageReports(guildId, status = null) {
 function updateMessageReport(reportId, updates) {
   const allowedFields = ['status', 'claimed_by', 'resolved_by', 'resolved_at'];
   const fields = Object.keys(updates).filter(key => allowedFields.includes(key));
-  
-  if (fields.length === 0) return false;
-  
+
+  if (fields.length === 0) {return false;}
+
   const setClause = fields.map(f => `${f} = ?`).join(', ');
   const values = fields.map(f => updates[f]);
   values.push(reportId);
-  
+
   const result = db.prepare(`UPDATE message_reports SET ${setClause} WHERE id = ?`).run(...values);
   return result.changes > 0;
 }
@@ -1315,18 +1330,18 @@ function deleteMessageReport(reportId) {
  */
 function getModerationSettings(guildId) {
   let settings = db.prepare('SELECT * FROM moderation_settings WHERE guild_id = ?').get(guildId);
-  
+
   if (!settings) {
     // Ensure guild settings exist first
     getGuildSettings(guildId);
-    
+
     db.prepare(`
       INSERT INTO moderation_settings (guild_id) VALUES (?)
     `).run(guildId);
-    
+
     settings = db.prepare('SELECT * FROM moderation_settings WHERE guild_id = ?').get(guildId);
   }
-  
+
   return settings;
 }
 
@@ -1339,7 +1354,7 @@ function getModerationSettings(guildId) {
 function updateModerationSettings(guildId, updates) {
   // Ensure settings exist
   getModerationSettings(guildId);
-  
+
   const allowedFields = [
     'report_enabled', 'report_channel', 'persistent_mute_enabled', 'mute_role',
     'warn_mute_threshold', 'warn_kick_threshold', 'warn_ban_threshold', 'warn_expire_days',
@@ -1347,21 +1362,21 @@ function updateModerationSettings(guildId, updates) {
     'notify_warn', 'notify_kick', 'notify_ban', 'notify_unban', 'notify_timeout', 'notify_mute',
     'lockdown_channels', 'lockdown_active', 'lockdown_message'
   ];
-  
+
   // Check for unknown fields and warn about them
   const unknownFields = Object.keys(updates).filter(key => !allowedFields.includes(key));
   if (unknownFields.length > 0) {
     console.warn(`[Database] Warning: Unknown moderation fields will be skipped: ${unknownFields.join(', ')}`);
   }
-  
+
   const fields = Object.keys(updates).filter(key => allowedFields.includes(key));
-  
-  if (fields.length === 0) return { success: false, skippedFields: unknownFields };
-  
+
+  if (fields.length === 0) {return { success: false, skippedFields: unknownFields };}
+
   const setClause = fields.map(f => `${f} = ?`).join(', ');
   const values = fields.map(f => updates[f]);
   values.push(guildId);
-  
+
   db.prepare(`UPDATE moderation_settings SET ${setClause} WHERE guild_id = ?`).run(...values);
   return { success: true, skippedFields: unknownFields };
 }
@@ -1374,19 +1389,19 @@ function updateModerationSettings(guildId, updates) {
 function getAuditLogSettings(guildId) {
   // Ensure guild settings exist first
   getGuildSettings(guildId);
-  
+
   let settings = db.prepare('SELECT * FROM audit_log_settings WHERE guild_id = ?').get(guildId);
-  
+
   if (!settings) {
     db.prepare('INSERT INTO audit_log_settings (guild_id) VALUES (?)').run(guildId);
     settings = db.prepare('SELECT * FROM audit_log_settings WHERE guild_id = ?').get(guildId);
   }
-  
+
   // Parse JSON fields
   settings.ignored_roles = JSON.parse(settings.ignored_roles || '[]');
   settings.ignored_channels = JSON.parse(settings.ignored_channels || '[]');
   settings.monitored_roles = JSON.parse(settings.monitored_roles || '[]');
-  
+
   return settings;
 }
 
@@ -1399,7 +1414,7 @@ function getAuditLogSettings(guildId) {
 function updateAuditLogSettings(guildId, updates) {
   // Ensure settings exist
   getAuditLogSettings(guildId);
-  
+
   const allowedFields = [
     'ignored_roles', 'ignored_channels',
     'user_join_enabled', 'user_join_channel', 'user_join_color',
@@ -1434,11 +1449,11 @@ function updateAuditLogSettings(guildId, updates) {
     'monitored_roles_enabled', 'monitored_roles', 'monitored_roles_channel', 'monitored_roles_color',
     'enabled'
   ];
-  
+
   const fields = Object.keys(updates).filter(key => allowedFields.includes(key));
-  
-  if (fields.length === 0) return false;
-  
+
+  if (fields.length === 0) {return false;}
+
   // Stringify JSON fields
   const jsonFields = ['ignored_roles', 'ignored_channels', 'monitored_roles'];
   const processedUpdates = { ...updates };
@@ -1447,11 +1462,11 @@ function updateAuditLogSettings(guildId, updates) {
       processedUpdates[field] = JSON.stringify(processedUpdates[field]);
     }
   });
-  
+
   const setClause = fields.map(f => `${f} = ?`).join(', ');
   const values = fields.map(f => processedUpdates[f]);
   values.push(guildId);
-  
+
   db.prepare(`UPDATE audit_log_settings SET ${setClause} WHERE guild_id = ?`).run(...values);
   return true;
 }
@@ -1506,16 +1521,16 @@ function getTagsByOwner(guildId, ownerId) {
 function updateTag(id, updates) {
   const allowedFields = ['name', 'response', 'owner_id', 'owner_name'];
   const fields = Object.keys(updates).filter(key => allowedFields.includes(key));
-  
-  if (fields.length === 0) return false;
-  
+
+  if (fields.length === 0) {return false;}
+
   // If updating name, convert to lowercase
-  if (updates.name) updates.name = updates.name.toLowerCase();
-  
+  if (updates.name) {updates.name = updates.name.toLowerCase();}
+
   const setClause = fields.map(f => `${f} = ?`).join(', ');
   const values = fields.map(f => updates[f]);
   values.push(id);
-  
+
   db.prepare(`UPDATE tags SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(...values);
   return true;
 }
@@ -1564,16 +1579,16 @@ function transferTag(id, newOwnerId, newOwnerName) {
  */
 function getTrollDiscouragerSettings(guildId) {
   getGuildSettings(guildId);
-  
+
   let settings = db.prepare('SELECT * FROM troll_discourager_settings WHERE guild_id = ?').get(guildId);
-  
+
   if (!settings) {
     db.prepare('INSERT INTO troll_discourager_settings (guild_id) VALUES (?)').run(guildId);
     settings = db.prepare('SELECT * FROM troll_discourager_settings WHERE guild_id = ?').get(guildId);
   }
-  
+
   settings.target_users = JSON.parse(settings.target_users || '[]');
-  
+
   return settings;
 }
 
@@ -1594,12 +1609,12 @@ function updateTrollDiscouragerSettings(guildId, updates) {
     'emoji_spam_enabled', 'emoji_spam_chance',
     'spoiler_enabled', 'spoiler_chance'
   ];
-  
+
   getTrollDiscouragerSettings(guildId);
-  
+
   const fields = [];
   const values = [];
-  
+
   for (const [key, value] of Object.entries(updates)) {
     if (allowedFields.includes(key)) {
       fields.push(`${key} = ?`);
@@ -1610,12 +1625,12 @@ function updateTrollDiscouragerSettings(guildId, updates) {
       }
     }
   }
-  
-  if (fields.length === 0) return false;
-  
+
+  if (fields.length === 0) {return false;}
+
   values.push(guildId);
   db.prepare(`UPDATE troll_discourager_settings SET ${fields.join(', ')} WHERE guild_id = ?`).run(...values);
-  
+
   return true;
 }
 
@@ -1628,16 +1643,16 @@ function updateTrollDiscouragerSettings(guildId, updates) {
  */
 function getStarboardSettings(guildId) {
   getGuildSettings(guildId);
-  
+
   let settings = db.prepare('SELECT * FROM starboard_settings WHERE guild_id = ?').get(guildId);
-  
+
   if (!settings) {
     db.prepare('INSERT INTO starboard_settings (guild_id) VALUES (?)').run(guildId);
     settings = db.prepare('SELECT * FROM starboard_settings WHERE guild_id = ?').get(guildId);
   }
-  
+
   settings.ignored_channels = JSON.parse(settings.ignored_channels || '[]');
-  
+
   return settings;
 }
 
@@ -1652,12 +1667,12 @@ function updateStarboardSettings(guildId, updates) {
     'enabled', 'channel_id', 'emoji', 'threshold',
     'self_star', 'ignore_nsfw', 'ignored_channels'
   ];
-  
+
   getStarboardSettings(guildId);
-  
+
   const fields = [];
   const values = [];
-  
+
   for (const [key, value] of Object.entries(updates)) {
     if (allowedFields.includes(key)) {
       fields.push(`${key} = ?`);
@@ -1668,12 +1683,12 @@ function updateStarboardSettings(guildId, updates) {
       }
     }
   }
-  
-  if (fields.length === 0) return false;
-  
+
+  if (fields.length === 0) {return false;}
+
   values.push(guildId);
   db.prepare(`UPDATE starboard_settings SET ${fields.join(', ')} WHERE guild_id = ?`).run(...values);
-  
+
   return true;
 }
 
@@ -1686,7 +1701,7 @@ function updateStarboardSettings(guildId, updates) {
  * @param {string|null} starboardMessageId - The starboard message ID (null if not yet posted)
  * @param {number} starCount - The star count
  */
-function addStarboardMessage(guildId, originalMessageId, originalChannelId, authorId, starboardMessageId, starCount) {
+function addStarboardMessage({ guildId, originalMessageId, originalChannelId, authorId, starboardMessageId, starCount }) {
   db.prepare(`
     INSERT OR REPLACE INTO starboard_messages 
     (guild_id, original_message_id, original_channel_id, author_id, starboard_message_id, star_count)
@@ -1712,22 +1727,22 @@ function getStarboardMessage(guildId, originalMessageId) {
  */
 function updateStarboardMessage(guildId, originalMessageId, updates) {
   const allowedFields = ['starboard_message_id', 'star_count'];
-  
+
   const fields = [];
   const values = [];
-  
+
   for (const [key, value] of Object.entries(updates)) {
     if (allowedFields.includes(key)) {
       fields.push(`${key} = ?`);
       values.push(value);
     }
   }
-  
-  if (fields.length === 0) return false;
-  
+
+  if (fields.length === 0) {return false;}
+
   values.push(guildId, originalMessageId);
   db.prepare(`UPDATE starboard_messages SET ${fields.join(', ')} WHERE guild_id = ? AND original_message_id = ?`).run(...values);
-  
+
   return true;
 }
 
@@ -1749,20 +1764,20 @@ function removeStarboardMessage(guildId, originalMessageId) {
  */
 function getAntiRaidSettings(guildId) {
   getGuildSettings(guildId);
-  
+
   let settings = db.prepare('SELECT * FROM anti_raid_settings WHERE guild_id = ?').get(guildId);
-  
+
   if (!settings) {
     db.prepare('INSERT INTO anti_raid_settings (guild_id) VALUES (?)').run(guildId);
     settings = db.prepare('SELECT * FROM anti_raid_settings WHERE guild_id = ?').get(guildId);
   }
-  
+
   // Parse JSON arrays
   settings.message_spam_ignored_roles = JSON.parse(settings.message_spam_ignored_roles || '[]');
   settings.message_spam_ignored_channels = JSON.parse(settings.message_spam_ignored_channels || '[]');
   settings.other_checks_ignored_roles = JSON.parse(settings.other_checks_ignored_roles || '[]');
   settings.other_checks_ignored_channels = JSON.parse(settings.other_checks_ignored_channels || '[]');
-  
+
   return settings;
 }
 
@@ -1797,12 +1812,12 @@ function updateAntiRaidSettings(guildId, updates) {
     // Ban Evasion Detection
     'ban_evasion_enabled', 'ban_evasion_action', 'ban_evasion_channel', 'ban_evasion_role_ping'
   ];
-  
+
   getAntiRaidSettings(guildId);
-  
+
   const fields = [];
   const values = [];
-  
+
   for (const [key, value] of Object.entries(updates)) {
     if (allowedFields.includes(key)) {
       fields.push(`${key} = ?`);
@@ -1813,12 +1828,12 @@ function updateAntiRaidSettings(guildId, updates) {
       }
     }
   }
-  
-  if (fields.length === 0) return false;
-  
+
+  if (fields.length === 0) {return false;}
+
   values.push(guildId);
   db.prepare(`UPDATE anti_raid_settings SET ${fields.join(', ')} WHERE guild_id = ?`).run(...values);
-  
+
   return true;
 }
 
@@ -1831,14 +1846,14 @@ function updateAntiRaidSettings(guildId, updates) {
  */
 function getAltDetectionSettings(guildId) {
   getGuildSettings(guildId);
-  
+
   let settings = db.prepare('SELECT * FROM alt_detection_settings WHERE guild_id = ?').get(guildId);
-  
+
   if (!settings) {
     db.prepare('INSERT INTO alt_detection_settings (guild_id) VALUES (?)').run(guildId);
     settings = db.prepare('SELECT * FROM alt_detection_settings WHERE guild_id = ?').get(guildId);
   }
-  
+
   return settings;
 }
 
@@ -1850,24 +1865,24 @@ function getAltDetectionSettings(guildId) {
  */
 function updateAltDetectionSettings(guildId, updates) {
   const allowedFields = ['enabled', 'retention_days'];
-  
+
   getAltDetectionSettings(guildId);
-  
+
   const fields = [];
   const values = [];
-  
+
   for (const [key, value] of Object.entries(updates)) {
     if (allowedFields.includes(key)) {
       fields.push(`${key} = ?`);
       values.push(value);
     }
   }
-  
-  if (fields.length === 0) return false;
-  
+
+  if (fields.length === 0) {return false;}
+
   values.push(guildId);
   db.prepare(`UPDATE alt_detection_settings SET ${fields.join(', ')} WHERE guild_id = ?`).run(...values);
-  
+
   return true;
 }
 
@@ -1933,21 +1948,21 @@ function cleanupOldPossibleAlts(guildId = null, retentionDays = null) {
     // Clean specific guild with specific retention
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
-    
+
     db.prepare(`
       DELETE FROM possible_alts 
       WHERE guild_id = ? AND detected_at < ?
     `).run(guildId, cutoffDate.toISOString());
     return;
   }
-  
+
   // Clean all guilds based on their retention settings
   const guilds = db.prepare('SELECT guild_id, retention_days FROM alt_detection_settings WHERE retention_days > 0').all();
-  
+
   for (const guild of guilds) {
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - guild.retention_days);
-    
+
     db.prepare(`
       DELETE FROM possible_alts 
       WHERE guild_id = ? AND detected_at < ?
@@ -1971,7 +1986,7 @@ function createReminder(userId, message, remindAt) {
     INSERT INTO reminders (user_id, message, remind_at)
     VALUES (?, ?, ?)
   `).run(userId, message, remindAt.toISOString());
-  
+
   return {
     id: result.lastInsertRowid,
     user_id: userId,
@@ -2054,7 +2069,7 @@ function computeNextRun(data) {
     const [hours, minutes] = (data.run_at || '09:00').split(':').map(Number);
     const next = new Date(now);
     next.setHours(hours, minutes, 0, 0);
-    if (next <= now) next.setDate(next.getDate() + 1);
+    if (next <= now) {next.setDate(next.getDate() + 1);}
     return next.toISOString();
   }
 
@@ -2109,7 +2124,7 @@ function getAnnouncements(guildId) {
     'SELECT * FROM scheduled_announcements WHERE guild_id = ? ORDER BY next_run_at ASC'
   ).all(guildId);
   return rows.map(r => {
-    if (r.embed_json) r.embed_json = JSON.parse(r.embed_json);
+    if (r.embed_json) {r.embed_json = JSON.parse(r.embed_json);}
     return r;
   });
 }
@@ -2124,8 +2139,8 @@ function getAnnouncementById(id, guildId) {
   const row = db.prepare(
     'SELECT * FROM scheduled_announcements WHERE id = ? AND guild_id = ?'
   ).get(id, guildId);
-  if (!row) return null;
-  if (row.embed_json) row.embed_json = JSON.parse(row.embed_json);
+  if (!row) {return null;}
+  if (row.embed_json) {row.embed_json = JSON.parse(row.embed_json);}
   return row;
 }
 
@@ -2142,7 +2157,7 @@ function updateAnnouncement(id, guildId, updates) {
     'run_at', 'interval_minutes', 'day_of_week', 'next_run_at', 'enabled', 'last_run_at'
   ];
   const fields = Object.keys(updates).filter(k => allowedFields.includes(k));
-  if (fields.length === 0) return null;
+  if (fields.length === 0) {return null;}
 
   const processedUpdates = { ...updates };
   if (processedUpdates.embed_json && typeof processedUpdates.embed_json === 'object') {
@@ -2176,9 +2191,25 @@ function getDueAnnouncements() {
     "SELECT * FROM scheduled_announcements WHERE enabled = 1 AND next_run_at <= ?"
   ).all(now);
   return rows.map(r => {
-    if (r.embed_json) r.embed_json = JSON.parse(r.embed_json);
+    if (r.embed_json) {r.embed_json = JSON.parse(r.embed_json);}
     return r;
   });
+}
+
+/**
+ * Clean up old disabled announcements (auto-delete after inactivity threshold)
+ * @param {number} thresholdMs - Inactivity threshold in milliseconds
+ * @returns {number} Number of deleted announcements
+ */
+function cleanupOldAnnouncements(thresholdMs) {
+  const cutoff = new Date(Date.now() - thresholdMs).toISOString();
+  const result = db.prepare(
+    `DELETE FROM scheduled_announcements
+     WHERE enabled = 0
+       AND last_run_at IS NOT NULL
+       AND last_run_at <= ?`
+  ).run(cutoff);
+  return result.changes;
 }
 
 /**
@@ -2189,17 +2220,17 @@ function getDueAnnouncements() {
 function getCommandToggleSettings(guildId) {
   // Ensure guild settings exist first
   getGuildSettings(guildId);
-  
+
   let settings = db.prepare('SELECT * FROM command_toggle_settings WHERE guild_id = ?').get(guildId);
-  
+
   if (!settings) {
     db.prepare('INSERT INTO command_toggle_settings (guild_id) VALUES (?)').run(guildId);
     settings = db.prepare('SELECT * FROM command_toggle_settings WHERE guild_id = ?').get(guildId);
   }
-  
+
   // Parse JSON fields
   settings.disabled_commands = JSON.parse(settings.disabled_commands || '[]');
-  
+
   return settings;
 }
 
@@ -2212,8 +2243,8 @@ function getCommandToggleSettings(guildId) {
 function updateCommandToggleSettings(guildId, updates) {
   const allowedFields = ['admins_bypass', 'mods_bypass', 'disabled_commands'];
   const jsonFields = ['disabled_commands'];
-  
-  return updateTable('command_toggle_settings', 'guild_id', guildId, updates, allowedFields, jsonFields);
+
+  return updateTable({ table: 'command_toggle_settings', whereColumn: 'guild_id', whereValue: guildId, updates, allowedFields, jsonFields });
 }
 
 /**
@@ -2227,6 +2258,209 @@ function isCommandDisabled(guildId, commandName) {
   return settings.disabled_commands.includes(commandName);
 }
 
+// ==================== CUSTOM GUILD COMMANDS (DYNAMIC) ====================
+
+/**
+ * Get all custom guild commands for a guild
+ * @param {string} guildId - The guild ID
+ * @returns {Array} Array of custom command objects
+ */
+function getCustomGuildCommands(guildId) {
+  const rows = db.prepare(
+    'SELECT * FROM custom_guild_commands WHERE guild_id = ? ORDER BY category, command_name'
+  ).all(guildId);
+
+  return rows.map(row => ({
+    ...row,
+    subcommands: JSON.parse(row.subcommands || '[]')
+  }));
+}
+
+/**
+ * Get a single custom guild command by ID
+ * @param {string} guildId - The guild ID
+ * @param {number} commandId - The command ID
+ * @returns {Object|null} Custom command object or null
+ */
+function getCustomGuildCommand(guildId, commandId) {
+  const row = db.prepare(
+    'SELECT * FROM custom_guild_commands WHERE id = ? AND guild_id = ?'
+  ).get(commandId, guildId);
+
+  if (!row) {return null;}
+
+  return {
+    ...row,
+    subcommands: JSON.parse(row.subcommands || '[]')
+  };
+}
+
+/**
+ * Get a custom guild command by name
+ * @param {string} guildId - The guild ID
+ * @param {string} commandName - The command name
+ * @returns {Object|null} Custom command object or null
+ */
+function getCustomGuildCommandByName(guildId, commandName) {
+  const row = db.prepare(
+    'SELECT * FROM custom_guild_commands WHERE guild_id = ? AND command_name = ?'
+  ).get(guildId, commandName);
+
+  if (!row) {return null;}
+
+  return {
+    ...row,
+    subcommands: JSON.parse(row.subcommands || '[]')
+  };
+}
+
+/**
+ * Check if a guild has any custom commands (DB-based or file-based)
+ * @param {string} guildId - The guild ID
+ * @returns {boolean} True if guild has custom commands
+ */
+function guildHasCustomCommands(guildId) {
+  const row = db.prepare(
+    'SELECT COUNT(*) as count FROM custom_guild_commands WHERE guild_id = ?'
+  ).get(guildId);
+
+  return row && row.count > 0;
+}
+
+/**
+ * Create a new custom guild command
+ * @param {string} guildId - The guild ID
+ * @param {Object} data - Command data {command_name, command_description, category, subcommands}
+ * @returns {Object} The created command
+ */
+function createCustomGuildCommand(guildId, data) {
+  const { command_name, command_description = '', category = 'custom', subcommands = [], default_permissions = null } = data;
+
+  if (!command_name || typeof command_name !== 'string' || !/^[\w-]{1,32}$/.test(command_name)) {
+    throw new Error('Invalid command name. Must be 1-32 characters: letters, numbers, hyphens, underscores.');
+  }
+
+  const now = new Date().toISOString();
+
+  db.prepare(`
+    INSERT INTO custom_guild_commands (guild_id, command_name, command_description, category, subcommands, default_permissions, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(guildId, command_name.toLowerCase(), command_description, category, JSON.stringify(subcommands), default_permissions, now, now);
+
+  return getCustomGuildCommandByName(guildId, command_name.toLowerCase());
+}
+
+/**
+ * Update a custom guild command's metadata (name, description, category, enabled)
+ * @param {string} guildId - The guild ID
+ * @param {number} commandId - The command ID
+ * @param {Object} data - Fields to update
+ * @returns {Object|null} Updated command or null
+ */
+function updateCustomGuildCommand(guildId, commandId, data) {
+  const existing = getCustomGuildCommand(guildId, commandId);
+  if (!existing) {return null;}
+
+  const allowedFields = ['command_name', 'command_description', 'category', 'enabled', 'default_permissions'];
+  const updates = {};
+
+  for (const key of allowedFields) {
+    if (data[key] !== undefined) {
+      updates[key] = key === 'command_name' ? data[key].toLowerCase() : data[key];
+    }
+  }
+
+  if (Object.keys(updates).length === 0) {return existing;}
+
+  updates.updated_at = new Date().toISOString();
+
+  const setClause = Object.keys(updates).map(k => `${k} = ?`).join(', ');
+  const values = [...Object.values(updates), commandId, guildId];
+
+  db.prepare(`UPDATE custom_guild_commands SET ${setClause} WHERE id = ? AND guild_id = ?`).run(...values);
+
+  return getCustomGuildCommand(guildId, commandId);
+}
+
+/**
+ * Update subcommands for a custom guild command
+ * @param {string} guildId - The guild ID
+ * @param {number} commandId - The command ID
+ * @param {Array} subcommands - Array of subcommand objects [{name, description, response_type, response_content}]
+ * @returns {Object|null} Updated command or null
+ */
+function updateCustomCommandSubcommands(guildId, commandId, subcommands) {
+  const existing = getCustomGuildCommand(guildId, commandId);
+  if (!existing) {return null;}
+
+  // Validate subcommands
+  if (!Array.isArray(subcommands)) {
+    throw new Error('Subcommands must be an array');
+  }
+
+  for (const sc of subcommands) {
+    if (!sc.name || !/^[\w-]{1,32}$/.test(sc.name)) {
+      throw new Error(`Invalid subcommand name: "${sc.name}". Must be 1-32 chars: letters, numbers, hyphens, underscores.`);
+    }
+    if (!sc.description || typeof sc.description !== 'string' || sc.description.length > 100) {
+      throw new Error(`Invalid subcommand description for "${sc.name}". Must be 1-100 characters.`);
+    }
+    if (!['text', 'embed'].includes(sc.response_type)) {
+      throw new Error(`Invalid response_type for "${sc.name}". Must be "text" or "embed".`);
+    }
+    if (sc.response_type === 'embed') {
+      try {
+        if (typeof sc.response_content === 'string') {
+          JSON.parse(sc.response_content);
+        }
+      } catch {
+        throw new Error(`Invalid embed JSON for "${sc.name}". Must be valid JSON.`);
+      }
+    }
+  }
+
+  const now = new Date().toISOString();
+  db.prepare(
+    'UPDATE custom_guild_commands SET subcommands = ?, updated_at = ? WHERE id = ? AND guild_id = ?'
+  ).run(JSON.stringify(subcommands), now, commandId, guildId);
+
+  return getCustomGuildCommand(guildId, commandId);
+}
+
+/**
+ * Delete a custom guild command
+ * @param {string} guildId - The guild ID
+ * @param {number} commandId - The command ID
+ * @returns {boolean} True if deleted
+ */
+function deleteCustomGuildCommand(guildId, commandId) {
+  const result = db.prepare(
+    'DELETE FROM custom_guild_commands WHERE id = ? AND guild_id = ?'
+  ).run(commandId, guildId);
+
+  return result.changes > 0;
+}
+
+/**
+ * Get all custom guild commands across all guilds (for bot startup/deploy)
+ * @returns {Map<string, Array>} Map of guildId -> array of command objects
+ */
+function getAllCustomGuildCommands() {
+  const rows = db.prepare(
+    'SELECT * FROM custom_guild_commands WHERE enabled = 1 ORDER BY guild_id, category, command_name'
+  ).all();
+
+  const map = new Map();
+  for (const row of rows) {
+    const cmd = { ...row, subcommands: JSON.parse(row.subcommands || '[]') };
+    if (!map.has(row.guild_id)) {
+      map.set(row.guild_id, []);
+    }
+    map.get(row.guild_id).push(cmd);
+  }
+  return map;
+}
+
 // ==================== HONEYPOT ====================
 
 /**
@@ -2236,14 +2470,14 @@ function isCommandDisabled(guildId, commandName) {
  */
 function getHoneypotSettings(guildId) {
   getGuildSettings(guildId);
-  
+
   let settings = db.prepare('SELECT * FROM honeypot_settings WHERE guild_id = ?').get(guildId);
-  
+
   if (!settings) {
     db.prepare('INSERT INTO honeypot_settings (guild_id) VALUES (?)').run(guildId);
     settings = db.prepare('SELECT * FROM honeypot_settings WHERE guild_id = ?').get(guildId);
   }
-  
+
   return settings;
 }
 
@@ -2259,24 +2493,24 @@ function updateHoneypotSettings(guildId, updates) {
     'action', 'dm_user', 'delete_messages', 'keep_channel_empty',
     'embed_title', 'embed_description', 'embed_image', 'embed_message_id'
   ];
-  
+
   getHoneypotSettings(guildId);
-  
+
   const fields = [];
   const values = [];
-  
+
   for (const [key, value] of Object.entries(updates)) {
     if (allowedFields.includes(key)) {
       fields.push(`${key} = ?`);
       values.push(value);
     }
   }
-  
-  if (fields.length === 0) return { success: false };
-  
+
+  if (fields.length === 0) {return { success: false };}
+
   values.push(guildId);
   db.prepare(`UPDATE honeypot_settings SET ${fields.join(', ')} WHERE guild_id = ?`).run(...values);
-  
+
   return { success: true };
 }
 
@@ -2366,6 +2600,16 @@ module.exports = {
   // Honeypot
   getHoneypotSettings,
   updateHoneypotSettings,
+  // Custom Guild Commands (Dynamic)
+  getCustomGuildCommands,
+  getCustomGuildCommand,
+  getCustomGuildCommandByName,
+  guildHasCustomCommands,
+  createCustomGuildCommand,
+  updateCustomGuildCommand,
+  updateCustomCommandSubcommands,
+  deleteCustomGuildCommand,
+  getAllCustomGuildCommands,
   // Scheduled Announcements
   computeNextRun,
   createAnnouncement,
@@ -2373,5 +2617,6 @@ module.exports = {
   getAnnouncementById,
   updateAnnouncement,
   deleteAnnouncement,
-  getDueAnnouncements
+  getDueAnnouncements,
+  cleanupOldAnnouncements
 };

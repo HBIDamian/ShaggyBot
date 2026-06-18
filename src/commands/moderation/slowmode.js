@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, ChannelType, MessageFlags } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, ChannelType } = require('discord.js');
 const { createLogger } = require('../../utils/logger');
 const { replyError } = require('../../utils/moderationHelpers');
 
@@ -9,26 +9,26 @@ const MAX_SLOWMODE_SECONDS = 21600; // 6 hours
 // Parse time string like "1m", "30s", "2h" into seconds
 function parseTime(timeStr) {
   // Handle "off" or "0"
-  if (timeStr.toLowerCase() === 'off' || timeStr === '0') return 0;
-  
+  if (timeStr.toLowerCase() === 'off' || timeStr === '0') {return 0;}
+
   const match = timeStr.match(/^(\d+)([smh]?)$/i);
-  if (!match) return null;
-  
+  if (!match) {return null;}
+
   const value = parseInt(match[1]);
   const unit = (match[2] || 's').toLowerCase();
-  
+
   const multipliers = {
     's': 1,
     'm': 60,
     'h': 3600
   };
-  
+
   return value * multipliers[unit];
 }
 
 function formatDuration(seconds) {
-  if (seconds === 0) return 'Off';
-  if (seconds < 60) return `${seconds} second${seconds > 1 ? 's' : ''}`;
+  if (seconds === 0) {return 'Off';}
+  if (seconds < 60) {return `${seconds} second${seconds > 1 ? 's' : ''}`;}
   if (seconds < 3600) {
     const mins = Math.floor(seconds / 60);
     return `${mins} minute${mins > 1 ? 's' : ''}`;

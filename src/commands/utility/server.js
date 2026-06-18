@@ -5,28 +5,28 @@ module.exports = {
     .setName('server')
     .setDescription('Display information about the current server')
     .setDMPermission(false),
-  
+
   async execute(interaction) {
     const guild = interaction.guild;
-    
+
     // Exit if command was used in DMs
     if (!guild) {
       return interaction.reply({ content: 'This command can only be used in a server.', flags: MessageFlags.Ephemeral });
     }
-    
+
     // Get server creation date
     const createdAt = guild.createdAt;
     const createdDate = `${createdAt.getDate()}/${createdAt.getMonth() + 1}/${createdAt.getFullYear()}`;
-    
+
     // Get member counts
     const totalMembers = guild.memberCount;
     const botCount = guild.members.cache.filter(member => member.user.bot).size;
     const humanCount = totalMembers - botCount;
-    
+
     // Get boost status
     const boostLevel = guild.premiumTier;
     const boostCount = guild.premiumSubscriptionCount;
-    
+
     const embed = new EmbedBuilder()
       .setTitle(guild.name)
       .setDescription(`Information about this Discord server`)
@@ -46,7 +46,7 @@ module.exports = {
       )
       .setFooter({ text: `Requested by ${interaction.user.tag}` })
       .setTimestamp();
-    
+
     await interaction.reply({ embeds: [embed] });
   },
 };

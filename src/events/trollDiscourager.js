@@ -13,31 +13,31 @@ module.exports = {
   once: false,
   async execute(message) {
     // Skip bot messages and DMs
-    if (message.author.bot || !message.guild) return;
+    if (message.author.bot || !message.guild) {return;}
 
     // Get settings from database
     const settings = db.getTrollDiscouragerSettings(message.guild.id);
-    
+
     // Check if enabled
-    if (!settings.enabled) return;
-    
+    if (!settings.enabled) {return;}
+
     // Get target users from settings
     const targetUserIds = settings.target_users || [];
-    
+
     // Check if the user is in the target list
-    if (!targetUserIds.includes(message.author.id)) return;
+    if (!targetUserIds.includes(message.author.id)) {return;}
 
     // Build available actions based on what's enabled
     const actions = [];
-    if (settings.delete_enabled) actions.push('delete');
-    if (settings.mock_enabled) actions.push('mock');
-    if (settings.clown_enabled) actions.push('clown');
-    if (settings.reverse_enabled) actions.push('reverse');
-    if (settings.uwu_enabled) actions.push('uwu');
-    if (settings.emoji_spam_enabled) actions.push('emoji_spam');
-    if (settings.spoiler_enabled) actions.push('spoiler');
-    
-    if (actions.length === 0) return;
+    if (settings.delete_enabled) {actions.push('delete');}
+    if (settings.mock_enabled) {actions.push('mock');}
+    if (settings.clown_enabled) {actions.push('clown');}
+    if (settings.reverse_enabled) {actions.push('reverse');}
+    if (settings.uwu_enabled) {actions.push('uwu');}
+    if (settings.emoji_spam_enabled) {actions.push('emoji_spam');}
+    if (settings.spoiler_enabled) {actions.push('spoiler');}
+
+    if (actions.length === 0) {return;}
 
     // Securely choose one action (using crypto module for better randomness)
     const randomBytes = crypto.randomBytes(1);
@@ -45,7 +45,7 @@ module.exports = {
 
     // Generate a secure percentage chance
     const percentageChance = crypto.randomInt(100) + 1;
-    
+
     logger.debug(`Chosen action: ${chosenAction}, percentage chance: ${percentageChance}`);
 
     // Perform actions based on the chosen action and its individual chance
@@ -103,7 +103,7 @@ module.exports = {
  * Sleep utility
  */
 function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise(resolve => { setTimeout(resolve, ms); });
 }
 
 /**
@@ -113,7 +113,7 @@ function sleep(ms) {
  */
 function toggleCaseText(text) {
   let result = '';
-  
+
   for (let i = 0; i < text.length; i++) {
     const char = text[i];
     if (i % 2 === 0) {
@@ -122,7 +122,7 @@ function toggleCaseText(text) {
       result += char;
     }
   }
-  
+
   return result;
 }
 
@@ -132,7 +132,7 @@ function toggleCaseText(text) {
  * @returns {string} - Character with toggled case
  */
 function toggleCase(char) {
-  if (char.length !== 1) return char;
+  if (char.length !== 1) {return char;}
   if (/[a-zA-Z]/.test(char)) {
     return char === char.toUpperCase() ? char.toLowerCase() : char.toUpperCase();
   }
@@ -155,7 +155,7 @@ function reverseText(text) {
  */
 function uwuify(text) {
   const faces = ['(・`ω´・)', ';;w;;', 'owo', 'UwU', '>w<', '^w^', '(⁄ ⁄•⁄ω⁄•⁄ ⁄)', '(╥﹏╥)'];
-  
+
   let uwu = text
     .replace(/(?:r|l)/g, 'w')
     .replace(/(?:R|L)/g, 'W')
@@ -164,11 +164,11 @@ function uwuify(text) {
     .replace(/N([AEIOU])/g, 'NY$1')
     .replace(/ove/g, 'uv')
     .replace(/!+/g, ' ' + faces[crypto.randomInt(faces.length)] + ' ');
-  
+
   // Add random face at end sometimes
   if (crypto.randomInt(2) === 0) {
     uwu += ' ' + faces[crypto.randomInt(faces.length)];
   }
-  
+
   return uwu;
 }

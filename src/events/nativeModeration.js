@@ -10,9 +10,9 @@ const recentBotActions = new Map();
 
 /**
  * Add a recent bot action to prevent duplicate logging
- * @param {string} guildId 
- * @param {string} oderId 
- * @param {string} action 
+ * @param {string} guildId
+ * @param {string} oderId
+ * @param {string} action
  */
 function markBotAction(guildId, userId, action) {
   const key = `${guildId}-${userId}-${action}`;
@@ -43,8 +43,8 @@ async function fetchAuditLogEntry(guild, actionType, targetId, withinMs = 5000) 
       limit: 5
     });
 
-    const entry = auditLogs.entries.find(e => 
-      e.target?.id === targetId && 
+    const entry = auditLogs.entries.find(e =>
+      e.target?.id === targetId &&
       Date.now() - e.createdTimestamp < withinMs
     );
 
@@ -62,7 +62,7 @@ const guildBanAddHandler = {
   once: false,
   async execute(ban) {
     // Wait a moment for audit log to be created
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise(resolve => { setTimeout(resolve, 1000); });
 
     // Check if this was done by our bot's command
     if (wasBotAction(ban.guild.id, ban.user.id, 'ban')) {
@@ -71,8 +71,8 @@ const guildBanAddHandler = {
 
     // Fetch audit log to get moderator info
     const auditEntry = await fetchAuditLogEntry(
-      ban.guild, 
-      AuditLogEvent.MemberBanAdd, 
+      ban.guild,
+      AuditLogEvent.MemberBanAdd,
       ban.user.id
     );
 
@@ -112,7 +112,7 @@ const guildBanRemoveHandler = {
   once: false,
   async execute(ban) {
     // Wait a moment for audit log to be created
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise(resolve => { setTimeout(resolve, 1000); });
 
     // Check if this was done by our bot's command
     if (wasBotAction(ban.guild.id, ban.user.id, 'unban')) {
@@ -121,8 +121,8 @@ const guildBanRemoveHandler = {
 
     // Fetch audit log to get moderator info
     const auditEntry = await fetchAuditLogEntry(
-      ban.guild, 
-      AuditLogEvent.MemberBanRemove, 
+      ban.guild,
+      AuditLogEvent.MemberBanRemove,
       ban.user.id
     );
 
@@ -161,7 +161,7 @@ const guildMemberRemoveKickHandler = {
   once: false,
   async execute(member) {
     // Wait a moment for audit log to be created
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise(resolve => { setTimeout(resolve, 1000); });
 
     // Check if this was done by our bot's command
     if (wasBotAction(member.guild.id, member.user.id, 'kick')) {
@@ -170,8 +170,8 @@ const guildMemberRemoveKickHandler = {
 
     // Fetch audit log to check if this was a kick
     const auditEntry = await fetchAuditLogEntry(
-      member.guild, 
-      AuditLogEvent.MemberKick, 
+      member.guild,
+      AuditLogEvent.MemberKick,
       member.user.id
     );
 
@@ -220,7 +220,7 @@ const guildMemberUpdateTimeoutHandler = {
     }
 
     // Wait a moment for audit log to be created
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise(resolve => { setTimeout(resolve, 1000); });
 
     // Check if this was done by our bot's command
     if (wasBotAction(newMember.guild.id, newMember.user.id, 'timeout')) {
@@ -229,8 +229,8 @@ const guildMemberUpdateTimeoutHandler = {
 
     // Fetch audit log to get moderator info
     const auditEntry = await fetchAuditLogEntry(
-      newMember.guild, 
-      AuditLogEvent.MemberUpdate, 
+      newMember.guild,
+      AuditLogEvent.MemberUpdate,
       newMember.user.id
     );
 
@@ -286,9 +286,9 @@ function formatDuration(ms) {
   const hours = Math.floor(minutes / 60);
   const days = Math.floor(hours / 24);
 
-  if (days > 0) return `${days} day${days > 1 ? 's' : ''}`;
-  if (hours > 0) return `${hours} hour${hours > 1 ? 's' : ''}`;
-  if (minutes > 0) return `${minutes} minute${minutes > 1 ? 's' : ''}`;
+  if (days > 0) {return `${days} day${days > 1 ? 's' : ''}`;}
+  if (hours > 0) {return `${hours} hour${hours > 1 ? 's' : ''}`;}
+  if (minutes > 0) {return `${minutes} minute${minutes > 1 ? 's' : ''}`;}
   return `${seconds} second${seconds > 1 ? 's' : ''}`;
 }
 

@@ -43,12 +43,12 @@ module.exports = {
       action: 'mute',
       requireInGuild: true
     });
-    
-    if (error) return replyError(interaction, error);
+
+    if (error) {return replyError(interaction, error);}
 
     try {
       markBotAction(interaction.guildId, user.id, 'timeout');
-      
+
       await targetMember.timeout(MAX_TIMEOUT, `${reason} | By ${interaction.user.tag}`);
       db.logModAction(interaction.guildId, user.id, interaction.user.id, 'mute', reason);
 

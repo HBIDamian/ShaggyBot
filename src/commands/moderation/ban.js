@@ -37,7 +37,7 @@ module.exports = {
     const isSoftBan = interaction.options.getBoolean('softban') || false;
 
     const targetMember = await interaction.guild.members.fetch(user.id).catch(() => null);
-    
+
     const error = runModerationChecks({
       targetUser: user,
       executor: interaction.user,
@@ -46,13 +46,13 @@ module.exports = {
       executorMember: interaction.member,
       action: 'ban'
     });
-    
-    if (error) return replyError(interaction, error);
+
+    if (error) {return replyError(interaction, error);}
 
     try {
       markBotAction(interaction.guildId, user.id, 'ban');
-      if (isSoftBan) markBotAction(interaction.guildId, user.id, 'unban');
-      
+      if (isSoftBan) {markBotAction(interaction.guildId, user.id, 'unban');}
+
       if (!isSoftBan) {
         await sendPunishmentNotification({
           guild: interaction.guild,

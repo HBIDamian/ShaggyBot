@@ -1,4 +1,4 @@
-const { Events, EmbedBuilder, AuditLogEvent } = require('discord.js');
+const { Events, EmbedBuilder } = require('discord.js');
 const { createLogger } = require('../utils/logger');
 const db = require('../database/database');
 
@@ -8,8 +8,8 @@ const logger = createLogger('AuditLog');
  * Helper function to send audit log embed
  */
 async function sendAuditLog(guild, channelId, embed) {
-  if (!channelId) return;
-  
+  if (!channelId) {return;}
+
   try {
     const channel = guild.channels.cache.get(channelId);
     if (channel) {
@@ -28,7 +28,7 @@ function shouldIgnore(settings, member, channelId) {
   if (channelId && settings.ignored_channels.includes(channelId)) {
     return true;
   }
-  
+
   // Check ignored roles
   if (member && member.roles) {
     const memberRoles = member.roles.cache?.map(r => r.id) || [];
@@ -36,7 +36,7 @@ function shouldIgnore(settings, member, channelId) {
       return true;
     }
   }
-  
+
   return false;
 }
 
@@ -44,7 +44,7 @@ function shouldIgnore(settings, member, channelId) {
  * Convert hex color string to integer
  */
 function colorToInt(colorString) {
-  if (!colorString) return 0x5865F2;
+  if (!colorString) {return 0x5865F2;}
   return parseInt(colorString.replace('#', ''), 16);
 }
 
@@ -57,8 +57,8 @@ module.exports = {
     once: false,
     async execute(member) {
       const settings = db.getAuditLogSettings(member.guild.id);
-      if (!settings.enabled || !settings.user_join_enabled) return;
-      if (shouldIgnore(settings, member)) return;
+      if (!settings.enabled || !settings.user_join_enabled) {return;}
+      if (shouldIgnore(settings, member)) {return;}
 
       const embed = new EmbedBuilder()
         .setTitle('👋 Member Joined')
@@ -81,8 +81,8 @@ module.exports = {
     once: false,
     async execute(member) {
       const settings = db.getAuditLogSettings(member.guild.id);
-      if (!settings.enabled || !settings.user_leave_enabled) return;
-      if (shouldIgnore(settings, member)) return;
+      if (!settings.enabled || !settings.user_leave_enabled) {return;}
+      if (shouldIgnore(settings, member)) {return;}
 
       const roles = member.roles.cache
         .filter(r => r.id !== member.guild.id)
@@ -110,7 +110,7 @@ module.exports = {
     once: false,
     async execute(ban) {
       const settings = db.getAuditLogSettings(ban.guild.id);
-      if (!settings.enabled || !settings.user_banned_enabled) return;
+      if (!settings.enabled || !settings.user_banned_enabled) {return;}
 
       const embed = new EmbedBuilder()
         .setTitle('🔨 Member Banned')
@@ -132,8 +132,8 @@ module.exports = {
     once: false,
     async execute(oldMember, newMember) {
       const settings = db.getAuditLogSettings(newMember.guild.id);
-      if (!settings.enabled || !settings.user_modified_enabled) return;
-      if (shouldIgnore(settings, newMember)) return;
+      if (!settings.enabled || !settings.user_modified_enabled) {return;}
+      if (shouldIgnore(settings, newMember)) {return;}
 
       const changes = [];
 
@@ -162,7 +162,7 @@ module.exports = {
         }
       }
 
-      if (changes.length === 0) return;
+      if (changes.length === 0) {return;}
 
       const embed = new EmbedBuilder()
         .setTitle('✏️ Member Updated')
@@ -183,11 +183,11 @@ module.exports = {
     name: Events.MessageDelete,
     once: false,
     async execute(message) {
-      if (!message.guild || message.author?.bot) return;
+      if (!message.guild || message.author?.bot) {return;}
 
       const settings = db.getAuditLogSettings(message.guild.id);
-      if (!settings.enabled || !settings.message_deleted_enabled) return;
-      if (shouldIgnore(settings, message.member, message.channel.id)) return;
+      if (!settings.enabled || !settings.message_deleted_enabled) {return;}
+      if (shouldIgnore(settings, message.member, message.channel.id)) {return;}
 
       const embed = new EmbedBuilder()
         .setTitle('🗑️ Message Deleted')
@@ -218,12 +218,12 @@ module.exports = {
     name: Events.MessageUpdate,
     once: false,
     async execute(oldMessage, newMessage) {
-      if (!newMessage.guild || newMessage.author?.bot) return;
-      if (oldMessage.content === newMessage.content) return;
+      if (!newMessage.guild || newMessage.author?.bot) {return;}
+      if (oldMessage.content === newMessage.content) {return;}
 
       const settings = db.getAuditLogSettings(newMessage.guild.id);
-      if (!settings.enabled || !settings.message_modified_enabled) return;
-      if (shouldIgnore(settings, newMessage.member, newMessage.channel.id)) return;
+      if (!settings.enabled || !settings.message_modified_enabled) {return;}
+      if (shouldIgnore(settings, newMessage.member, newMessage.channel.id)) {return;}
 
       const embed = new EmbedBuilder()
         .setTitle('✏️ Message Edited')
@@ -246,11 +246,11 @@ module.exports = {
     name: Events.MessageBulkDelete,
     once: false,
     async execute(messages, channel) {
-      if (!channel.guild) return;
+      if (!channel.guild) {return;}
 
       const settings = db.getAuditLogSettings(channel.guild.id);
-      if (!settings.enabled || !settings.bulk_delete_enabled) return;
-      if (settings.ignored_channels.includes(channel.id)) return;
+      if (!settings.enabled || !settings.bulk_delete_enabled) {return;}
+      if (settings.ignored_channels.includes(channel.id)) {return;}
 
       const embed = new EmbedBuilder()
         .setTitle('🗑️ Bulk Messages Deleted')
@@ -271,33 +271,33 @@ module.exports = {
     once: false,
     async execute(oldState, newState) {
       const guild = newState.guild || oldState.guild;
-      if (!guild) return;
+      if (!guild) {return;}
 
       const settings = db.getAuditLogSettings(guild.id);
-      if (!settings.enabled) return;
+      if (!settings.enabled) {return;}
 
       const member = newState.member || oldState.member;
-      if (shouldIgnore(settings, member)) return;
+      if (shouldIgnore(settings, member)) {return;}
 
       let title, color, description, channel;
 
       if (!oldState.channelId && newState.channelId) {
         // Joined
-        if (!settings.voice_join_enabled) return;
+        if (!settings.voice_join_enabled) {return;}
         title = '🎤 Joined Voice Channel';
         color = settings.voice_join_color;
         channel = settings.voice_join_channel;
         description = `**Channel:** ${newState.channel}`;
       } else if (oldState.channelId && !newState.channelId) {
         // Left
-        if (!settings.voice_leave_enabled) return;
+        if (!settings.voice_leave_enabled) {return;}
         title = '🎤 Left Voice Channel';
         color = settings.voice_leave_color;
         channel = settings.voice_leave_channel;
         description = `**Channel:** ${oldState.channel}`;
       } else if (oldState.channelId !== newState.channelId) {
         // Swapped
-        if (!settings.voice_swap_enabled) return;
+        if (!settings.voice_swap_enabled) {return;}
         title = '🎤 Switched Voice Channel';
         color = settings.voice_swap_color;
         channel = settings.voice_swap_channel;
@@ -325,7 +325,7 @@ module.exports = {
     once: false,
     async execute(oldGuild, newGuild) {
       const settings = db.getAuditLogSettings(newGuild.id);
-      if (!settings.enabled || !settings.server_modified_enabled) return;
+      if (!settings.enabled || !settings.server_modified_enabled) {return;}
 
       const changes = [];
 
@@ -345,7 +345,7 @@ module.exports = {
         changes.push(`**Verification Level:** ${oldGuild.verificationLevel} → ${newGuild.verificationLevel}`);
       }
 
-      if (changes.length === 0) return;
+      if (changes.length === 0) {return;}
 
       const embed = new EmbedBuilder()
         .setTitle('🏠 Server Updated')
@@ -364,7 +364,7 @@ module.exports = {
     once: false,
     async execute(role) {
       const settings = db.getAuditLogSettings(role.guild.id);
-      if (!settings.enabled || !settings.role_created_enabled) return;
+      if (!settings.enabled || !settings.role_created_enabled) {return;}
 
       const embed = new EmbedBuilder()
         .setTitle('🎭 Role Created')
@@ -386,7 +386,7 @@ module.exports = {
     once: false,
     async execute(role) {
       const settings = db.getAuditLogSettings(role.guild.id);
-      if (!settings.enabled || !settings.role_deleted_enabled) return;
+      if (!settings.enabled || !settings.role_deleted_enabled) {return;}
 
       const embed = new EmbedBuilder()
         .setTitle('🎭 Role Deleted')
@@ -407,7 +407,7 @@ module.exports = {
     once: false,
     async execute(oldRole, newRole) {
       const settings = db.getAuditLogSettings(newRole.guild.id);
-      if (!settings.enabled || !settings.role_modified_enabled) return;
+      if (!settings.enabled || !settings.role_modified_enabled) {return;}
 
       const changes = [];
 
@@ -427,7 +427,7 @@ module.exports = {
         changes.push(`**Mentionable:** ${oldRole.mentionable} → ${newRole.mentionable}`);
       }
 
-      if (changes.length === 0) return;
+      if (changes.length === 0) {return;}
 
       const embed = new EmbedBuilder()
         .setTitle('🎭 Role Updated')
@@ -447,15 +447,15 @@ module.exports = {
     name: Events.ChannelCreate,
     once: false,
     async execute(channel) {
-      if (!channel.guild) return;
+      if (!channel.guild) {return;}
 
       const settings = db.getAuditLogSettings(channel.guild.id);
-      if (!settings.enabled || !settings.channel_created_enabled) return;
+      if (!settings.enabled || !settings.channel_created_enabled) {return;}
 
       // Check if we should ignore ticket channels
       if (settings.channel_created_ignore_tickets) {
         const name = channel.name.toLowerCase();
-        if (name.includes('ticket') || name.includes('support')) return;
+        if (name.includes('ticket') || name.includes('support')) {return;}
       }
 
       const embed = new EmbedBuilder()
@@ -476,14 +476,14 @@ module.exports = {
     name: Events.ChannelDelete,
     once: false,
     async execute(channel) {
-      if (!channel.guild) return;
+      if (!channel.guild) {return;}
 
       const settings = db.getAuditLogSettings(channel.guild.id);
-      if (!settings.enabled || !settings.channel_deleted_enabled) return;
+      if (!settings.enabled || !settings.channel_deleted_enabled) {return;}
 
       if (settings.channel_deleted_ignore_tickets) {
         const name = channel.name.toLowerCase();
-        if (name.includes('ticket') || name.includes('support')) return;
+        if (name.includes('ticket') || name.includes('support')) {return;}
       }
 
       const embed = new EmbedBuilder()
@@ -504,10 +504,10 @@ module.exports = {
     name: Events.ChannelUpdate,
     once: false,
     async execute(oldChannel, newChannel) {
-      if (!newChannel.guild) return;
+      if (!newChannel.guild) {return;}
 
       const settings = db.getAuditLogSettings(newChannel.guild.id);
-      if (!settings.enabled || !settings.channel_modified_enabled) return;
+      if (!settings.enabled || !settings.channel_modified_enabled) {return;}
 
       const changes = [];
 
@@ -524,7 +524,7 @@ module.exports = {
         changes.push(`**Slowmode:** ${oldChannel.rateLimitPerUser}s → ${newChannel.rateLimitPerUser}s`);
       }
 
-      if (changes.length === 0) return;
+      if (changes.length === 0) {return;}
 
       const embed = new EmbedBuilder()
         .setTitle('📁 Channel Updated')
@@ -544,10 +544,10 @@ module.exports = {
     name: Events.InviteCreate,
     once: false,
     async execute(invite) {
-      if (!invite.guild) return;
+      if (!invite.guild) {return;}
 
       const settings = db.getAuditLogSettings(invite.guild.id);
-      if (!settings.enabled || !settings.invite_created_enabled) return;
+      if (!settings.enabled || !settings.invite_created_enabled) {return;}
 
       const embed = new EmbedBuilder()
         .setTitle('🔗 Invite Created')
@@ -570,10 +570,10 @@ module.exports = {
     name: Events.InviteDelete,
     once: false,
     async execute(invite) {
-      if (!invite.guild) return;
+      if (!invite.guild) {return;}
 
       const settings = db.getAuditLogSettings(invite.guild.id);
-      if (!settings.enabled || !settings.invite_deleted_enabled) return;
+      if (!settings.enabled || !settings.invite_deleted_enabled) {return;}
 
       const embed = new EmbedBuilder()
         .setTitle('🔗 Invite Deleted')
@@ -593,10 +593,10 @@ module.exports = {
     name: Events.ThreadCreate,
     once: false,
     async execute(thread, newlyCreated) {
-      if (!newlyCreated) return;
+      if (!newlyCreated) {return;}
 
       const settings = db.getAuditLogSettings(thread.guild.id);
-      if (!settings.enabled || !settings.thread_created_enabled) return;
+      if (!settings.enabled || !settings.thread_created_enabled) {return;}
 
       const embed = new EmbedBuilder()
         .setTitle('🧵 Thread Created')
@@ -617,7 +617,7 @@ module.exports = {
     once: false,
     async execute(thread) {
       const settings = db.getAuditLogSettings(thread.guild.id);
-      if (!settings.enabled || !settings.thread_deleted_enabled) return;
+      if (!settings.enabled || !settings.thread_deleted_enabled) {return;}
 
       const embed = new EmbedBuilder()
         .setTitle('🧵 Thread Deleted')
@@ -637,7 +637,7 @@ module.exports = {
     once: false,
     async execute(oldThread, newThread) {
       const settings = db.getAuditLogSettings(newThread.guild.id);
-      if (!settings.enabled || !settings.thread_modified_enabled) return;
+      if (!settings.enabled || !settings.thread_modified_enabled) {return;}
 
       const changes = [];
 
@@ -651,7 +651,7 @@ module.exports = {
         changes.push(`**Locked:** ${oldThread.locked} → ${newThread.locked}`);
       }
 
-      if (changes.length === 0) return;
+      if (changes.length === 0) {return;}
 
       const embed = new EmbedBuilder()
         .setTitle('🧵 Thread Updated')
@@ -672,7 +672,7 @@ module.exports = {
     once: false,
     async execute(stageInstance) {
       const settings = db.getAuditLogSettings(stageInstance.guild.id);
-      if (!settings.enabled || !settings.stage_started_enabled) return;
+      if (!settings.enabled || !settings.stage_started_enabled) {return;}
 
       const embed = new EmbedBuilder()
         .setTitle('🎭 Stage Started')
@@ -693,7 +693,7 @@ module.exports = {
     once: false,
     async execute(stageInstance) {
       const settings = db.getAuditLogSettings(stageInstance.guild.id);
-      if (!settings.enabled || !settings.stage_ended_enabled) return;
+      if (!settings.enabled || !settings.stage_ended_enabled) {return;}
 
       const embed = new EmbedBuilder()
         .setTitle('🎭 Stage Ended')
@@ -714,7 +714,7 @@ module.exports = {
     once: false,
     async execute(oldStage, newStage) {
       const settings = db.getAuditLogSettings(newStage.guild.id);
-      if (!settings.enabled || !settings.stage_modified_enabled) return;
+      if (!settings.enabled || !settings.stage_modified_enabled) {return;}
 
       const changes = [];
 
@@ -722,7 +722,7 @@ module.exports = {
         changes.push(`**Topic:** ${oldStage.topic} → ${newStage.topic}`);
       }
 
-      if (changes.length === 0) return;
+      if (changes.length === 0) {return;}
 
       const embed = new EmbedBuilder()
         .setTitle('🎭 Stage Updated')
@@ -745,8 +745,8 @@ module.exports = {
       // This event fires when webhooks are created, updated, or deleted
       // We can't tell which action occurred, so we just log the channel
       const settings = db.getAuditLogSettings(channel.guild.id);
-      if (!settings.enabled) return;
-      
+      if (!settings.enabled) {return;}
+
       // Check if any webhook logging is enabled
       if (!settings.webhook_created_enabled && !settings.webhook_modified_enabled && !settings.webhook_deleted_enabled) {
         return;

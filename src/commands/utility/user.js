@@ -5,20 +5,20 @@ module.exports = {
     .setName('user')
     .setDescription('Display information about a user')
     .setDMPermission(true)
-    .addUserOption(option => 
+    .addUserOption(option =>
       option.setName('target')
         .setDescription('The user to display information about')
         .setRequired(false)),
-  
+
   async execute(interaction) {
     // Get the target user (or the command user if no target specified)
     const targetUser = interaction.options.getUser('target') || interaction.user;
     const member = interaction.guild?.members.cache.get(targetUser.id);
-    
+
     // Calculate join dates
     const discordJoined = targetUser.createdAt;
     const discordJoinDate = `<t:${Math.floor(discordJoined.getTime() / 1000)}:R>`;
-    
+
     // Get user badges
     const flags = targetUser.flags?.toArray() || [];
     const badges = flags.length ? flags.map(flag => {
@@ -35,7 +35,7 @@ module.exports = {
       };
       return badgeMap[flag] || flag;
     }).join('\n') : 'None';
-    
+
     // Build the embed
     const embed = new EmbedBuilder()
       .setTitle(`User Information: ${targetUser.tag}`)
@@ -48,7 +48,7 @@ module.exports = {
       )
       .setFooter({ text: `Requested by ${interaction.user.tag}` })
       .setTimestamp();
-    
+
     // Add guild-specific information if in a guild
     if (member) {
       const guildJoined = member.joinedAt;
@@ -58,14 +58,14 @@ module.exports = {
         .sort((a, b) => b.position - a.position)
         .map(role => `<@&${role.id}>`)
         .join(', ') || 'None';
-      
+
       embed.addFields(
         { name: '📥 Server Joined', value: guildJoinDate, inline: true },
         { name: '📛 Nickname', value: member.nickname || 'None', inline: true },
         { name: `🏷️ Roles [${member.roles.cache.size - 1}]`, value: roles.slice(0, 1024) || 'None', inline: false }
       );
     }
-    
+
     await interaction.reply({ embeds: [embed] });
   },
 };

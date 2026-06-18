@@ -1,4 +1,4 @@
-const { ContextMenuCommandBuilder, ApplicationCommandType, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits , MessageFlags } = require('discord.js');
+const { ContextMenuCommandBuilder, ApplicationCommandType, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } = require('discord.js');
 const db = require('../database/database');
 const { createLogger } = require('../utils/logger');
 
@@ -9,15 +9,15 @@ module.exports = {
     .setName('Report Message')
     .setType(ApplicationCommandType.Message)
     .setDMPermission(false),
-  
+
   async execute(interaction) {
     const message = interaction.targetMessage;
     const guild = interaction.guild;
     const reporter = interaction.user;
-    
+
     // Get moderation settings
     const modSettings = db.getModerationSettings(guild.id);
-    
+
     // Check if report feature is enabled
     if (!modSettings?.report_enabled) {
       return interaction.reply({
@@ -25,7 +25,7 @@ module.exports = {
         flags: MessageFlags.Ephemeral
       });
     }
-    
+
     // Check if report channel is configured
     if (!modSettings?.report_channel) {
       return interaction.reply({
@@ -33,7 +33,7 @@ module.exports = {
         flags: MessageFlags.Ephemeral
       });
     }
-    
+
     // Get the report channel
     const reportChannel = guild.channels.cache.get(modSettings.report_channel);
     if (!reportChannel) {
@@ -42,7 +42,7 @@ module.exports = {
         flags: MessageFlags.Ephemeral
       });
     }
-    
+
     // Don't allow reporting own messages
     if (message.author.id === reporter.id) {
       return interaction.reply({
@@ -50,7 +50,7 @@ module.exports = {
         flags: MessageFlags.Ephemeral
       });
     }
-    
+
     // Don't allow reporting bot messages
     if (message.author.bot) {
       return interaction.reply({
@@ -58,13 +58,13 @@ module.exports = {
         flags: MessageFlags.Ephemeral
       });
     }
-    
+
     // Create the report ID
     const reportId = `report_${Date.now()}_${message.id}`;
-    
+
     // Calculate relative time for message sent
     const messageTimestamp = Math.floor(message.createdTimestamp / 1000);
-    
+
     // Create the report embed
     const reportEmbed = new EmbedBuilder()
       .setColor(0xFF6B6B)
@@ -78,23 +78,23 @@ module.exports = {
         `<@${message.author.id}> (${message.author.id}) in <#${message.channel.id}>.`
       )
       .addFields(
-        { 
-          name: 'Message ID:', 
-          value: message.id, 
-          inline: true 
+        {
+          name: 'Message ID:',
+          value: message.id,
+          inline: true
         },
-        { 
-          name: 'Message Sent:', 
-          value: `<t:${messageTimestamp}:R>`, 
-          inline: true 
+        {
+          name: 'Message Sent:',
+          value: `<t:${messageTimestamp}:R>`,
+          inline: true
         },
-        { 
-          name: 'Jump To:', 
-          value: `[#${message.channel.name}](${message.url})`, 
-          inline: true 
+        {
+          name: 'Jump To:',
+          value: `[#${message.channel.name}](${message.url})`,
+          inline: true
         },
-        { 
-          name: 'Message:', 
+        {
+          name: 'Message:',
           value: message.content?.substring(0, 1024) || '*No text content*'
         }
       )
@@ -103,7 +103,7 @@ module.exports = {
         iconURL: reporter.displayAvatarURL({ dynamic: true })
       })
       .setTimestamp();
-    
+
     // Add attachments info if any
     if (message.attachments.size > 0) {
       const attachmentList = message.attachments.map(a => `[${a.name}](${a.url})`).join('\n');
@@ -112,7 +112,7 @@ module.exports = {
         value: attachmentList.substring(0, 1024)
       });
     }
-    
+
     // Create action buttons
     const actionRow1 = new ActionRowBuilder()
       .addComponents(
@@ -133,7 +133,7 @@ module.exports = {
           .setLabel('Delete Report')
           .setStyle(ButtonStyle.Secondary)
       );
-    
+
     const actionRow2 = new ActionRowBuilder()
       .addComponents(
         new ButtonBuilder()
@@ -145,19 +145,19 @@ module.exports = {
           .setLabel('Mark Finished')
           .setStyle(ButtonStyle.Success)
       );
-    
+
     try {
       // Send the report to the report channel
       await reportChannel.send({
         embeds: [reportEmbed],
         components: [actionRow1, actionRow2]
       });
-      
+
       logger.info(`Message reported in ${guild.name}: ${message.id} by ${reporter.tag}`);
-      
+
       // Store the report in database
-      db.createMessageReport(guild.id, message.id, message.author.id, reporter.id, message.channel.id, message.content);
-      
+      db.createMessageReport({ guildId: guild.id, messageId: message.id, reportedUserId: message.author.id, reporterId: reporter.id, channelId: message.channel.id, messageContent: message.content });
+
       return interaction.reply({
         content: '✅ Your report has been submitted. Thank you for helping keep this server safe!',
         flags: MessageFlags.Ephemeral
