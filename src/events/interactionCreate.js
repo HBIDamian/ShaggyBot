@@ -144,6 +144,11 @@ async function handleContextMenuCommand(interaction, client) {
 async function handleButtonInteraction(interaction, client) {
   const customId = interaction.customId;
 
+  // Handle audit log moderation buttons (audit_kick_, audit_ban_, audit_timeout1h_)
+  if (customId.startsWith('audit_')) {
+    return handleAuditModButton(interaction);
+  }
+
   // Handle view warnings button
   if (customId.startsWith('view_warnings_')) {
     return handleViewWarnings(interaction, customId.replace('view_warnings_', ''));
@@ -200,6 +205,59 @@ async function handleButtonInteraction(interaction, client) {
         content: '❌ An error occurred while processing this action.',
         flags: MessageFlags.Ephemeral
       });
+    }
+  }
+}
+
+/**
+ * Handle audit log moderation quick-action buttons (Kick / Ban / Timeout 1 Hour)
+ */
+async function handleAuditModButton(interaction) {
+  const parts = interaction.customId.split('_'); // ['audit', action, userId]
+  const action = parts[1]; // 'kick' | 'ban' | 'timeout1h'
+  const targetId = parts[2];
+
+  const permMap = {
+    kick: PermissionFlagsBits.KickMembers,
+    ban: PermissionFlagsBits.BanMembers,
+    timeout1h: PermissionFlagsBits.ModerateMembers,
+  };
+
+  if (!interaction.member.permissions.has(permMap[action])) {
+    return interaction.reply({ content: '❌ You don\'t have permission to do that.', flags: MessageFlags.Ephemeral });
+  }
+
+  try {
+    if (action === 'kick') {
+      const target = await interaction.guild.members.fetch(targetId).catch(() => null);
+      if (!target) return interaction.reply({ content: '❌ Member not found — they may have already left.', flags: MessageFlags.Ephemeral });
+      await target.kick(`Quick-action by ${interaction.user.username} via audit log`);
+      await interaction.reply({ content: `✅ Kicked **${target.user.username}**.`, flags: MessageFlags.Ephemeral });
+
+    } else if (action === 'ban') {
+      await interaction.guild.bans.create(targetId, { reason: `Quick-action by ${interaction.user.username} via audit log` });
+      await interaction.reply({ content: `✅ Banned <@${targetId}>.`, flags: MessageFlags.Ephemeral });
+
+    } else if (action === 'timeout1h') {
+      const target = await interaction.guild.members.fetch(targetId).catch(() => null);
+      if (!target) return interaction.reply({ content: '❌ Member not found.', flags: MessageFlags.Ephemeral });
+      await target.timeout(60 * 60 * 1000, `Quick-action by ${interaction.user.username} via audit log`);
+      await interaction.reply({ content: `✅ Timed out **${target.user.username}** for 1 hour.`, flags: MessageFlags.Ephemeral });
+    }
+
+    // Disable the buttons on the original message after action is taken
+    const disabledRow = interaction.message.components[0] && new (require('discord.js').ActionRowBuilder)()
+      .addComponents(
+        interaction.message.components[0].components.map(btn =>
+          require('discord.js').ButtonBuilder.from(btn).setDisabled(true)
+        )
+      );
+    if (disabledRow) await interaction.message.edit({ components: [disabledRow] }).catch(() => {});
+
+  } catch (err) {
+    logger.error(`Audit mod button error: ${err.message}`);
+    if (!interaction.replied) {
+      await interaction.reply({ content: `❌ Failed: ${err.message}`, flags: MessageFlags.Ephemeral });
     }
   }
 }

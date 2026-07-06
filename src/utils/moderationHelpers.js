@@ -61,6 +61,12 @@ function checkHierarchy(targetMember, executorMember, action) {
 function checkBotPermission(targetMember, action) {
   if (!targetMember) {return null;}
 
+  // Database-only actions that don't require bot moderation permissions
+  const dbOnlyActions = ['warn', 'unwarn', 'clearwarnings'];
+  if (dbOnlyActions.includes(action)) {
+    return null;
+  }
+
   const checks = {
     kick: () => !targetMember.kickable,
     ban: () => !targetMember.bannable,

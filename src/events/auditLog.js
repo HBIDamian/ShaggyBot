@@ -1,4 +1,4 @@
-const { Events, EmbedBuilder } = require('discord.js');
+const { Events, EmbedBuilder, AuditLogEvent, ActionRowBuilder, ButtonBuilder, ButtonStyle, AttachmentBuilder } = require('discord.js');
 const { createLogger } = require('../utils/logger');
 const db = require('../database/database');
 
@@ -7,13 +7,16 @@ const logger = createLogger('AuditLog');
 /**
  * Helper function to send audit log embed
  */
-async function sendAuditLog(guild, channelId, embed) {
+async function sendAuditLog(guild, channelId, embed, row = null, files = []) {
   if (!channelId) {return;}
 
   try {
     const channel = guild.channels.cache.get(channelId);
     if (channel) {
-      await channel.send({ embeds: [embed] });
+      const payload = { embeds: [embed] };
+      if (row) payload.components = [row];
+      if (files.length > 0) payload.files = files;
+      await channel.send(payload);
     }
   } catch (error) {
     logger.error(`Failed to send audit log: ${error.message}`);
@@ -48,7 +51,120 @@ function colorToInt(colorString) {
   return parseInt(colorString.replace('#', ''), 16);
 }
 
+/**
+ * Format a Date to "DD/MM/YYYY HH:MM:SS +00:00"
+ */
+function formatDateUTC(date) {
+  const pad = n => String(n).padStart(2, '0');
+  const d = new Date(date);
+  return `${pad(d.getUTCDate())}/${pad(d.getUTCMonth() + 1)}/${d.getUTCFullYear()} ` +
+    `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())} +00:00`;
+}
+
+/**
+ * Format a duration in ms to "X years, X months, X days, X hours, X minutes and X seconds"
+ */
+function formatDuration(ms) {
+  const totalSeconds = Math.floor(ms / 1000);
+  const totalMinutes = Math.floor(totalSeconds / 60);
+  const totalHours = Math.floor(totalMinutes / 60);
+  const totalDays = Math.floor(totalHours / 24);
+
+  const years = Math.floor(totalDays / 365);
+  const months = Math.floor((totalDays % 365) / 30);
+  const days = Math.floor((totalDays % 365) % 30);
+  const hours = totalHours % 24;
+  const minutes = totalMinutes % 60;
+  const seconds = totalSeconds % 60;
+
+  const parts = [];
+  if (years > 0) parts.push(`${years} year${years !== 1 ? 's' : ''}`);
+  if (months > 0) parts.push(`${months} month${months !== 1 ? 's' : ''}`);
+  if (days > 0) parts.push(`${days} day${days !== 1 ? 's' : ''}`);
+  if (hours > 0) parts.push(`${hours} hour${hours !== 1 ? 's' : ''}`);
+  if (minutes > 0) parts.push(`${minutes} minute${minutes !== 1 ? 's' : ''}`);
+  parts.push(`${seconds} second${seconds !== 1 ? 's' : ''}`);
+
+  if (parts.length === 1) return parts[0];
+  return parts.slice(0, -1).join(', ') + ' and ' + parts[parts.length - 1];
+}
+
 // ==================== USER EVENTS ====================
+
+// ==================== DELETION POOL ====================
+// Batches individual messageDelete events so a purge/ban doesn't spam the log channel.
+// All deletes within DEBOUNCE_MS of each other in a guild are collected into one log.
+
+const DEBOUNCE_MS = 2500;
+const deletionPool = new Map(); // guildId -> { messages: [], timer, settings, guild }
+
+function poolMessage(guild, settings, msgData) {
+  let pool = deletionPool.get(guild.id);
+  if (!pool) {
+    pool = { messages: [], timer: null, settings, guild };
+    deletionPool.set(guild.id, pool);
+  }
+  pool.messages.push(msgData);
+  clearTimeout(pool.timer);
+  pool.timer = setTimeout(() => flushDeletionPool(guild.id), DEBOUNCE_MS);
+}
+
+async function flushDeletionPool(guildId) {
+  const pool = deletionPool.get(guildId);
+  if (!pool || pool.messages.length === 0) {return;}
+  deletionPool.delete(guildId);
+
+  const { messages, settings, guild } = pool;
+  const count = messages.length;
+
+  // --- Build .txt attachment ---
+  const lines = [
+    '=== Deleted Messages Log ===',
+    `Guild: ${guild.name} (${guild.id})`,
+    `Logged at: ${new Date().toUTCString()}`,
+    '',
+  ];
+  for (const msg of messages) {
+    lines.push(`[#${msg.channelName}] ${msg.authorTag} (${msg.authorId}) — Message ID: ${msg.id}`);
+    lines.push(`Content: ${msg.content || '(no text content)'}`);
+    if (msg.attachments.length > 0) {
+      lines.push(`Attachments: ${msg.attachments.join(', ')}`);
+    }
+    lines.push('');
+  }
+  const txtBuffer = Buffer.from(lines.join('\n'), 'utf-8');
+  const attachment = new AttachmentBuilder(txtBuffer, { name: 'deleted-messages.txt' });
+
+  // --- Build embed ---
+  const uniqueChannels = [...new Map(messages.map(m => [m.channelId, m.channelMention])).values()];
+  const uniqueUsers   = [...new Map(messages.map(m => [m.authorId,  `${m.authorTag} (${m.authorId})`])).values()];
+
+  const channelsValue = uniqueChannels.join('\n').slice(0, 1024) || 'Unknown';
+  const usersValue    = uniqueUsers.join('\n').slice(0, 1024)    || 'Unknown';
+
+  const embed = new EmbedBuilder()
+    .setTitle(`🗑️ ${count} Message${count !== 1 ? 's' : ''} Deleted`)
+    .setColor(colorToInt(settings.message_deleted_color))
+    .addFields(
+      { name: 'Messages', value: `${count}`, inline: true },
+      { name: `Channel${uniqueChannels.length !== 1 ? 's' : ''}`, value: channelsValue, inline: true },
+      { name: `User${uniqueUsers.length !== 1 ? 's' : ''}`, value: usersValue, inline: true }
+    )
+    .setDescription('Full context in the file below.')
+    .setFooter({ text: `Guild ID: ${guild.id}` })
+    .setTimestamp();
+
+  // Send embed first, then the file so it appears below the embed
+  const channel = guild.channels.cache.get(settings.message_deleted_channel);
+  if (channel) {
+    try {
+      await channel.send({ embeds: [embed] });
+      await channel.send({ files: [attachment] });
+    } catch (error) {
+      logger.error(`Failed to send deletion log: ${error.message}`);
+    }
+  }
+}
 
 module.exports = {
   // Guild Member Add (User Join)
@@ -60,18 +176,36 @@ module.exports = {
       if (!settings.enabled || !settings.user_join_enabled) {return;}
       if (shouldIgnore(settings, member)) {return;}
 
+      const createdTs = Math.floor(member.user.createdTimestamp / 1000);
+
       const embed = new EmbedBuilder()
+        .setAuthor({ name: member.guild.name, iconURL: member.guild.iconURL({ dynamic: true }) ?? undefined })
         .setTitle('👋 Member Joined')
+        .setDescription(`**User Joined:** ${member.user} (${member.user.username})`)
         .setColor(colorToInt(settings.user_join_color))
         .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
         .addFields(
-          { name: 'User', value: `${member.user.tag}\n${member.user.id}`, inline: true },
-          { name: 'Account Created', value: `<t:${Math.floor(member.user.createdTimestamp / 1000)}:R>`, inline: true },
-          { name: 'Member Count', value: `${member.guild.memberCount}`, inline: true }
+          { name: 'Account Created On:', value: `Created on <t:${createdTs}:F>. That's <t:${createdTs}:R>!` }
         )
+        .setFooter({ text: `User ID: ${member.user.id} • Guild ID: ${member.guild.id}` })
         .setTimestamp();
 
-      await sendAuditLog(member.guild, settings.user_join_channel, embed);
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId(`audit_kick_${member.user.id}`)
+          .setLabel('Kick User')
+          .setStyle(ButtonStyle.Danger),
+        new ButtonBuilder()
+          .setCustomId(`audit_ban_${member.user.id}`)
+          .setLabel('Ban User')
+          .setStyle(ButtonStyle.Danger),
+        new ButtonBuilder()
+          .setCustomId(`audit_timeout1h_${member.user.id}`)
+          .setLabel('Timeout 1 Hour')
+          .setStyle(ButtonStyle.Danger)
+      );
+
+      await sendAuditLog(member.guild, settings.user_join_channel, embed, row);
     }
   },
 
@@ -84,21 +218,73 @@ module.exports = {
       if (!settings.enabled || !settings.user_leave_enabled) {return;}
       if (shouldIgnore(settings, member)) {return;}
 
-      const roles = member.roles.cache
+      // Joined Guild field
+      const joinedField = member.joinedAt
+        ? `${formatDateUTC(member.joinedAt)} (<t:${Math.floor(member.joinedTimestamp / 1000)}:R>)`
+        : 'Unknown';
+
+      // Stayed For field
+      const stayedFor = member.joinedAt
+        ? formatDuration(Date.now() - member.joinedTimestamp)
+        : 'Unknown';
+
+      // Roles field
+      const roleNames = member.roles.cache
         .filter(r => r.id !== member.guild.id)
-        .map(r => r.toString())
-        .join(', ') || 'None';
+        .sort((a, b) => b.position - a.position)
+        .map(r => r.name);
+      const roleCount = roleNames.length;
+      let rolesValue = roleCount > 0 ? roleNames.join(', ') : 'None';
+      if (rolesValue.length > 1000) rolesValue = rolesValue.slice(0, 997) + '...';
+
+      // Check audit log for kick or ban (moderation-triggered leave)
+      let modActionName = null;
+      let modReason = null;
+      let modExecutor = null;
+      try {
+        const kickLogs = await member.guild.fetchAuditLogs({ type: AuditLogEvent.MemberKick, limit: 5 });
+        const kickEntry = kickLogs.entries.find(
+          e => e.target?.id === member.user.id && Date.now() - e.createdTimestamp < 10000
+        );
+        if (kickEntry) {
+          modActionName = 'Kick';
+          modReason = kickEntry.reason || 'No reason provided';
+          modExecutor = kickEntry.executor;
+        }
+      } catch { /* audit log access denied or unavailable */ }
+
+      if (!modActionName) {
+        try {
+          const banLogs = await member.guild.fetchAuditLogs({ type: AuditLogEvent.MemberBanAdd, limit: 5 });
+          const banEntry = banLogs.entries.find(
+            e => e.target?.id === member.user.id && Date.now() - e.createdTimestamp < 10000
+          );
+          if (banEntry) {
+            modActionName = 'Ban';
+            modReason = banEntry.reason || 'No reason provided';
+            modExecutor = banEntry.executor;
+          }
+        } catch { /* audit log access denied or unavailable */ }
+      }
 
       const embed = new EmbedBuilder()
+        .setAuthor({ name: member.guild.name, iconURL: member.guild.iconURL({ dynamic: true }) ?? undefined })
         .setTitle('👋 Member Left')
+        .setDescription(`**User Left:** ${member.user} (${member.user.username})`)
         .setColor(colorToInt(settings.user_leave_color))
         .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
         .addFields(
-          { name: 'User', value: `${member.user.tag}\n${member.user.id}`, inline: true },
-          { name: 'Joined', value: member.joinedAt ? `<t:${Math.floor(member.joinedTimestamp / 1000)}:R>` : 'Unknown', inline: true },
-          { name: 'Roles', value: roles.length > 1000 ? roles.slice(0, 1000) + '...' : roles }
+          { name: 'Joined Guild', value: joinedField },
+          { name: 'Stayed For', value: stayedFor },
+          { name: `Roles [${roleCount}]`, value: `\`\`\`${rolesValue}\`\`\`` }
         )
+        .setFooter({ text: `User ID: ${member.user.id} • Guild ID: ${member.guild.id}` })
         .setTimestamp();
+
+      if (modActionName) {
+        const executorText = modExecutor ? ` by ${modExecutor.tag ?? modExecutor.username}` : '';
+        embed.addFields({ name: `⚠️ Triggered By: ${modActionName}${executorText}`, value: `**Reason:** ${modReason}` });
+      }
 
       await sendAuditLog(member.guild, settings.user_leave_channel, embed);
     }
@@ -189,27 +375,16 @@ module.exports = {
       if (!settings.enabled || !settings.message_deleted_enabled) {return;}
       if (shouldIgnore(settings, message.member, message.channel.id)) {return;}
 
-      const embed = new EmbedBuilder()
-        .setTitle('🗑️ Message Deleted')
-        .setColor(colorToInt(settings.message_deleted_color))
-        .addFields(
-          { name: 'Author', value: message.author ? `${message.author.tag}\n${message.author.id}` : 'Unknown', inline: true },
-          { name: 'Channel', value: `${message.channel}\n${message.channel.id}`, inline: true }
-        )
-        .setTimestamp();
-
-      if (message.content) {
-        embed.setDescription(`**Content:**\n${message.content.slice(0, 1000)}${message.content.length > 1000 ? '...' : ''}`);
-      }
-
-      if (message.attachments.size > 0) {
-        embed.addFields({
-          name: 'Attachments',
-          value: message.attachments.map(a => a.name).join('\n').slice(0, 1000)
-        });
-      }
-
-      await sendAuditLog(message.guild, settings.message_deleted_channel, embed);
+      poolMessage(message.guild, settings, {
+        id:             message.id,
+        content:        message.content || '',
+        authorTag:      message.author?.username ?? 'Unknown',
+        authorId:       message.author?.id ?? 'Unknown',
+        channelName:    message.channel.name ?? message.channel.id,
+        channelId:      message.channel.id,
+        channelMention: `${message.channel}`,
+        attachments:    message.attachments.map(a => a.name),
+      });
     }
   },
 
@@ -252,16 +427,27 @@ module.exports = {
       if (!settings.enabled || !settings.bulk_delete_enabled) {return;}
       if (settings.ignored_channels.includes(channel.id)) {return;}
 
-      const embed = new EmbedBuilder()
-        .setTitle('🗑️ Bulk Messages Deleted')
-        .setColor(colorToInt(settings.bulk_delete_color))
-        .addFields(
-          { name: 'Channel', value: `${channel}\n${channel.id}`, inline: true },
-          { name: 'Messages Deleted', value: `${messages.size}`, inline: true }
-        )
-        .setTimestamp();
+      // Feed every message into the shared pool and flush immediately
+      for (const msg of messages.values()) {
+        if (msg.author?.bot) {continue;}
+        poolMessage(channel.guild, settings, {
+          id:             msg.id,
+          content:        msg.content || '',
+          authorTag:      msg.author?.username ?? 'Unknown',
+          authorId:       msg.author?.id ?? 'Unknown',
+          channelName:    channel.name ?? channel.id,
+          channelId:      channel.id,
+          channelMention: `${channel}`,
+          attachments:    msg.attachments?.map(a => a.name) ?? [],
+        });
+      }
 
-      await sendAuditLog(channel.guild, settings.bulk_delete_channel, embed);
+      // Force an immediate flush instead of waiting for the debounce
+      const pool = deletionPool.get(channel.guild.id);
+      if (pool) {
+        clearTimeout(pool.timer);
+        await flushDeletionPool(channel.guild.id);
+      }
     }
   },
 
